@@ -94,7 +94,7 @@ const Orders = () => {
                 Gurukrupa Agency
               </p>
               <h1 className="mt-1 text-2xl font-bold sm:text-3xl">
-                Today's Orders
+                Today &apos; s Orders
               </h1>
             </div>
           </div>
@@ -174,7 +174,7 @@ const Orders = () => {
           <div className="flex items-center justify-between border-b border-slate-800 px-5 py-5 sm:px-6">
             <div>
               <h2 className="font-semibold text-white">
-                Today's Invoices
+                Today &apos; s Invoices
               </h2>
               <p className="mt-1 text-xs text-slate-400">
                 Select an invoice to view its details.
@@ -190,7 +190,7 @@ const Orders = () => {
             <div className="flex flex-col items-center justify-center px-5 py-20 text-center">
               <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-700 border-t-amber-400" />
               <p className="mt-4 text-sm text-slate-400">
-                Loading today's orders...
+                Loading today &apos; s orders...
               </p>
             </div>
           ) : error ? (
@@ -290,7 +290,7 @@ const Orders = () => {
                           </h3>
 
                           <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-400">
-                            Today's Order
+                            Today &apos; s Order
                           </span>
                         </div>
 
