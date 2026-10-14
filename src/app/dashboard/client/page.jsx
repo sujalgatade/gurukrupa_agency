@@ -1,3 +1,4 @@
+
 "use client";
 
 import axios from "axios";
@@ -22,6 +23,13 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
+const EMPTY_CLIENT = {
+  clientname: "",
+  address: "",
+  gstNumber: "",
+  phone: "",
+};
+
 export default function ClientDetails() {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -31,14 +39,7 @@ export default function ClientDetails() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const emptyClient = {
-    clientname: "",
-    address: "",
-    gstNumber: "",
-    phone: "",
-  };
-
-  const [client, setClient] = useState(emptyClient);
+  const [client, setClient] = useState(EMPTY_CLIENT);
 
   const fetchClients = useCallback(async () => {
     setLoading(true);
@@ -75,7 +76,9 @@ export default function ClientDetails() {
         item.address,
         item.gstNumber,
         item.phone,
-      ].some((value) => String(value ?? "").toLowerCase().includes(query))
+      ].some((value) =>
+        String(value ?? "").toLowerCase().includes(query)
+      )
     );
   }, [clients, search]);
 
@@ -103,13 +106,9 @@ export default function ClientDetails() {
       phone: client.phone.trim(),
     };
 
-    if (
-      !cleanedClient.clientname ||
-      !cleanedClient.address ||
-      !cleanedClient.gstNumber ||
-      !cleanedClient.phone
-    ) {
-      setError("Please complete all client details before saving.");
+    // Only Client Name and Business Address are mandatory.
+    if (!cleanedClient.clientname || !cleanedClient.address) {
+      setError("Please enter the client name and business address.");
       return;
     }
 
@@ -119,7 +118,7 @@ export default function ClientDetails() {
       const res = await axios.post("/api/client", cleanedClient);
 
       if (res.data.success) {
-        setClient(emptyClient);
+        setClient({ ...EMPTY_CLIENT });
         setShowForm(false);
         setSuccess("Client added successfully.");
         await fetchClients();
@@ -129,7 +128,8 @@ export default function ClientDetails() {
     } catch (err) {
       console.error("Error adding client:", err);
       setError(
-        err.response?.data?.message || "Unable to save client. Please try again."
+        err.response?.data?.message ||
+          "Unable to save client. Please try again."
       );
     } finally {
       setSubmitting(false);
@@ -138,7 +138,7 @@ export default function ClientDetails() {
 
   const closeForm = () => {
     setShowForm(false);
-    setClient(emptyClient);
+    setClient({ ...EMPTY_CLIENT });
     setError("");
   };
 
@@ -172,8 +172,8 @@ export default function ClientDetails() {
                 </h1>
 
                 <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">
-                  Manage your customer information, GST details, contact
-                  numbers, and business addresses in one place.
+                  Manage customer information and business addresses.
+                  GST and phone details are optional.
                 </p>
               </div>
             </div>
@@ -241,7 +241,7 @@ export default function ClientDetails() {
                   {loading ? "—" : filteredClients.length}
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  Clients matching your search
+                  Matching customers
                 </p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-400/10 text-blue-300">
@@ -320,7 +320,7 @@ export default function ClientDetails() {
                     Add New Client
                   </h2>
                   <p className="mt-1 text-xs text-slate-400">
-                    Enter the customer's business and contact information.
+                    Client Name and Business Address are required.
                   </p>
                 </div>
               </div>
@@ -338,6 +338,7 @@ export default function ClientDetails() {
 
             <form onSubmit={handleSubmit} className="space-y-6 p-5 sm:p-7">
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                {/* Client Name - Required */}
                 <div>
                   <label
                     htmlFor="clientname"
@@ -364,12 +365,16 @@ export default function ClientDetails() {
                   </div>
                 </div>
 
+                {/* GST Number - Optional */}
                 <div>
                   <label
                     htmlFor="gstNumber"
                     className="mb-2 block text-sm font-semibold text-slate-200"
                   >
-                    GST Number <span className="text-amber-400">*</span>
+                    GST Number{" "}
+                    <span className="text-xs font-normal text-slate-500">
+                      (Optional)
+                    </span>
                   </label>
                   <div className="relative">
                     <ReceiptText
@@ -382,20 +387,23 @@ export default function ClientDetails() {
                       name="gstNumber"
                       value={client.gstNumber}
                       onChange={handleChange}
-                      placeholder="Enter GSTIN"
+                      placeholder="Enter GSTIN if available"
                       autoComplete="off"
-                      required
                       className="w-full rounded-xl border border-slate-700 bg-[#0b1220] py-3 pl-10 pr-4 text-sm uppercase text-white outline-none transition placeholder:text-slate-600 focus:border-amber-400/70 focus:ring-2 focus:ring-amber-400/10"
                     />
                   </div>
                 </div>
 
+                {/* Phone Number - Optional */}
                 <div>
                   <label
                     htmlFor="phone"
                     className="mb-2 block text-sm font-semibold text-slate-200"
                   >
-                    Phone Number <span className="text-amber-400">*</span>
+                    Phone Number{" "}
+                    <span className="text-xs font-normal text-slate-500">
+                      (Optional)
+                    </span>
                   </label>
                   <div className="relative">
                     <Phone
@@ -408,14 +416,14 @@ export default function ClientDetails() {
                       name="phone"
                       value={client.phone}
                       onChange={handleChange}
-                      placeholder="Enter contact number"
+                      placeholder="Enter contact number if available"
                       autoComplete="tel"
-                      required
                       className="w-full rounded-xl border border-slate-700 bg-[#0b1220] py-3 pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-amber-400/70 focus:ring-2 focus:ring-amber-400/10"
                     />
                   </div>
                 </div>
 
+                {/* Business Address - Required */}
                 <div>
                   <label
                     htmlFor="address"
@@ -527,7 +535,7 @@ export default function ClientDetails() {
               </h3>
               <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
                 Your client directory is empty. Add your first client to keep
-                business contact details organized.
+                business details organized.
               </p>
               {!showForm && (
                 <button
@@ -599,7 +607,10 @@ export default function ClientDetails() {
                         <td className="px-6 py-5">
                           <div className="flex items-center gap-3">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-400/10 bg-amber-400/10 text-sm font-bold text-amber-300">
-                              {(c.clientname || "C").trim().charAt(0).toUpperCase()}
+                              {(c.clientname || "C")
+                                .trim()
+                                .charAt(0)
+                                .toUpperCase()}
                             </div>
                             <div className="min-w-0">
                               <p className="max-w-48 truncate text-sm font-semibold text-white">
@@ -658,7 +669,10 @@ export default function ClientDetails() {
                   >
                     <div className="flex items-start gap-3">
                       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-400/10 text-lg font-bold text-amber-300">
-                        {(c.clientname || "C").trim().charAt(0).toUpperCase()}
+                        {(c.clientname || "C")
+                          .trim()
+                          .charAt(0)
+                          .toUpperCase()}
                       </div>
 
                       <div className="min-w-0 flex-1">

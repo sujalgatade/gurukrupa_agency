@@ -217,6 +217,7 @@ const CreateBill = () => {
 
       console.log(res.data);
       alert("Invoice created successfully!");
+      
     } catch (error) {
       console.error("Error creating invoice:", error);
       alert("Failed to create invoice. Check console for details.");

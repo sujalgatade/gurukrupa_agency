@@ -1,15 +1,13 @@
+
 import React from "react";
 
 const InvoicePrint = ({ invoiceData }) => {
+  const formatAmount = (value) => Number(value ?? 0).toFixed(2);
+
   return (
     <div
       style={{
-        // width: "210mm", // A4 width
-        // minHeight: "245mm", // A4 height
-        // padding: "20mm",
-        // margin: "auto",
         backgroundColor: "white",
-
         boxSizing: "border-box",
         fontFamily: "Arial, sans-serif",
         color: "#000",
@@ -21,35 +19,104 @@ const InvoicePrint = ({ invoiceData }) => {
         style={{
           display: "flex",
           justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: "20px",
           marginBottom: "32px",
+          borderBottom: "2px solid #222",
+          paddingBottom: "16px",
         }}
       >
-        <div>
-          <h2 style={{ fontSize: "20px", fontWeight: "bold" }}>
+        {/* Agency Information */}
+        <div style={{ flex: 1 }}>
+          <h2
+            style={{
+              fontSize: "24px",
+              fontWeight: "bold",
+              margin: "0 0 10px 0",
+            }}
+          >
             Gurukrupa Agency
           </h2>
-          <p>Chinale Galli</p>
-          <p>1234567890</p>
-          <p>fsgfs@hghg.h</p>
+
+          <div
+            style={{
+              fontSize: "12px",
+              lineHeight: "1.8",
+            }}
+          >
+            <p style={{ margin: "2px 0" }}>
+              <strong>GSTIN:</strong> 27BXJPG3749K1Z1
+            </p>
+            <p style={{ margin: "6px 0 0 0" }}>
+              <strong>FDA Lic. No.:</strong> 21525086001585
+            </p>
+
+            <p style={{ margin: "2px 0" }}>
+              <strong>Bank Details:</strong>
+            </p>
+
+            <p style={{ margin: "2px 0" }}>
+              <strong>Bank:</strong> BANK OF INDIA
+            </p>
+
+            <p style={{ margin: "2px 0" }}>
+              <strong>Branch:</strong> Peth Vadgaon
+            </p>
+
+            <p style={{ margin: "2px 0" }}>
+              <strong>IFSC:</strong> BKID0000922
+            </p>
+
+            <p style={{ margin: "2px 0" }}>
+              <strong>A/c. No.:</strong> 092220110000773
+            </p>
+
+          </div>
         </div>
-        <div style={{ textAlign: "right" }}>
-          <p style={{ fontSize: "16px", fontWeight: "600" }}>
-            Invoice #: {invoiceData?.invoiceNumber}
+
+        {/* Invoice Information */}
+        <div
+          style={{
+            textAlign: "right",
+            minWidth: "150px",
+          }}
+        >
+          <h3
+            style={{
+              fontSize: "18px",
+              fontWeight: "bold",
+              margin: "0 0 12px 0",
+            }}
+          >
+            INVOICE
+          </h3>
+
+          <p style={{ fontSize: "14px", fontWeight: "600", margin: "6px 0" }}>
+            Invoice #: {invoiceData?.invoiceNumber || "-"}
           </p>
-          <p>
+
+          <p style={{ fontSize: "13px", margin: "6px 0" }}>
             Date:{" "}
             {invoiceData?.issueDate
-              ? new Date(invoiceData.issueDate).toLocaleDateString()
+              ? new Date(invoiceData.issueDate).toLocaleDateString("en-IN")
               : "-"}
           </p>
         </div>
       </div>
 
-      {/* Customer Info */}
+      {/* Customer Information */}
       <div style={{ marginBottom: "32px" }}>
-        <h3 style={{ fontWeight: "600" }}>Bill To:</h3>
-        <p>{invoiceData?.client?.clientname}</p>
-        <p>{invoiceData?.client?.address}</p>
+        <h3 style={{ fontWeight: "600", marginBottom: "8px" }}>
+          Bill To:
+        </h3>
+
+        <p style={{ margin: "4px 0" }}>
+          {invoiceData?.client?.clientname || "-"}
+        </p>
+
+        <p style={{ margin: "4px 0", whiteSpace: "pre-line" }}>
+          {invoiceData?.client?.address || "-"}
+        </p>
       </div>
 
       {/* Items Table */}
@@ -71,6 +138,7 @@ const InvoicePrint = ({ invoiceData }) => {
             >
               Description
             </th>
+
             <th
               style={{
                 border: "1px solid #d1d5db",
@@ -78,8 +146,18 @@ const InvoicePrint = ({ invoiceData }) => {
                 textAlign: "center",
               }}
             >
-              Qty
+              Item Qty
             </th>
+            <th
+              style={{
+                border: "1px solid #d1d5db",
+                padding: "8px",
+                textAlign: "center",
+              }}
+            >
+              Box Qty
+            </th>
+
             <th
               style={{
                 border: "1px solid #d1d5db",
@@ -87,8 +165,9 @@ const InvoicePrint = ({ invoiceData }) => {
                 textAlign: "right",
               }}
             >
-              Rate
+              Rate (₹)
             </th>
+
             <th
               style={{
                 border: "1px solid #d1d5db",
@@ -96,13 +175,14 @@ const InvoicePrint = ({ invoiceData }) => {
                 textAlign: "right",
               }}
             >
-              Amount
+              Amount (₹)
             </th>
           </tr>
         </thead>
+
         <tbody>
-          {invoiceData?.items?.map((item) => (
-            <tr key={item.id}>
+          {invoiceData?.items?.map((item, index) => (
+            <tr key={item.id ?? index}>
               <td
                 style={{
                   border: "1px solid #d1d5db",
@@ -111,6 +191,7 @@ const InvoicePrint = ({ invoiceData }) => {
               >
                 {item.description}
               </td>
+
               <td
                 style={{
                   border: "1px solid #d1d5db",
@@ -124,11 +205,12 @@ const InvoicePrint = ({ invoiceData }) => {
                 style={{
                   border: "1px solid #d1d5db",
                   padding: "8px",
-                  textAlign: "right",
+                  textAlign: "center",
                 }}
               >
-                {item.rate.toFixed(2)}
+                {item.boxQty}
               </td>
+
               <td
                 style={{
                   border: "1px solid #d1d5db",
@@ -136,35 +218,55 @@ const InvoicePrint = ({ invoiceData }) => {
                   textAlign: "right",
                 }}
               >
-                {item.amount.toFixed(2)}
+                {formatAmount(item.rate)}
+              </td>
+
+              <td
+                style={{
+                  border: "1px solid #d1d5db",
+                  padding: "8px",
+                  textAlign: "right",
+                }}
+              >
+                {formatAmount(item.amount)}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      {/* Totals */}
+      {/* Invoice Totals */}
       <div style={{ textAlign: "right", marginBottom: "24px" }}>
         <p>
           Subtotal:{" "}
           <span style={{ fontWeight: "600" }}>
-            {invoiceData?.subtotal?.toFixed(2)}
+            ₹{formatAmount(invoiceData?.subtotal)}
           </span>
         </p>
+
         <p>
           Tax (5%):{" "}
           <span style={{ fontWeight: "600" }}>
-            {invoiceData?.tax?.toFixed(2)}
+            ₹{formatAmount(invoiceData?.tax)}
           </span>
         </p>
+
         <p style={{ fontSize: "18px", fontWeight: "bold" }}>
-          Total: {invoiceData?.total?.toFixed(2)}
+          Total: ₹{formatAmount(invoiceData?.total)}
         </p>
       </div>
 
       {/* Notes */}
-      <div>
-        <h3 style={{ fontWeight: "600" }}>Notes: Thank you!!</h3>
+      <div
+        style={{
+          borderTop: "1px solid #d1d5db",
+          paddingTop: "12px",
+          marginTop: "32px",
+        }}
+      >
+        <h3 style={{ fontWeight: "600", margin: 0 }}>
+          Notes: Thank you!!
+        </h3>
       </div>
     </div>
   );
