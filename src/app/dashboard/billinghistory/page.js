@@ -1,4 +1,3 @@
-
 "use client";
 
 import InvoicePrint from "@/components/InvoicePrint";
@@ -6,59 +5,104 @@ import printDocument from "@/lib/printDocument";
 import axios from "axios";
 import { useState, useEffect, useMemo } from "react";
 
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+const currentDate = new Date();
+
 const Billinghistory = () => {
   const [bills, setBills] = useState([]);
-  const [month, setMonth] = useState(new Date().getMonth() + 1);
-  const [year, setYear] = useState(new Date().getFullYear());
+  const [month, setMonth] = useState(currentDate.getMonth() + 1);
+  const [year, setYear] = useState(currentDate.getFullYear());
+  const [selectedDay, setSelectedDay] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [retryCount, setRetryCount] = useState(0);
 
-  // Fetch bills whenever month or year changes
+  // Fetch bills whenever the month, year, or retry changes.
   useEffect(() => {
+    let cancelled = false;
+
     const fetchBills = async () => {
       setLoading(true);
       setError("");
 
       try {
-        const res = await axios.get(
-          `/api/bill?month=${month}&year=${year}`
-        );
+        const res = await axios.get("/api/bill", {
+          params: { month, year },
+        });
 
-        setBills(res.data.data || []);
+        if (!cancelled) {
+          setBills(Array.isArray(res.data?.data) ? res.data.data : []);
+        }
       } catch (e) {
         console.error("Error fetching billing history:", e);
-        setBills([]);
-        setError("Unable to load billing history. Please try again.");
+
+        if (!cancelled) {
+          setBills([]);
+          setError("Unable to load billing history. Please try again.");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     fetchBills();
-  }, [month, year]);
 
-  // Search invoices by invoice number or client name
-  const filteredBills = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
+    return () => {
+      cancelled = true;
+    };
+  }, [month, year, retryCount]);
 
-    return bills.filter((bill) => {
-      const invoiceNumber = String(bill.invoiceNumber ?? "").toLowerCase();
-      const clientName = String(bill.client?.clientname ?? "").toLowerCase();
+  // Convert a date into YYYY-MM-DD for reliable day filtering.
+  const getDateKey = (value) => {
+    if (!value) return "";
 
-      return invoiceNumber.includes(term) || clientName.includes(term);
+    if (typeof value === "string") {
+      const match = value.match(/^(\d{4}-\d{2}-\d{2})/);
+
+      if (match) return match[1];
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) return "";
+
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+
+    return `${y}-${m}-${d}`;
+  };
+
+  const formatDate = (value) => {
+    if (!value) return "Date unavailable";
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) return "Date unavailable";
+
+    return date.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
     });
-  }, [bills, searchTerm]);
-
-  // Calculate summary values from the selected month's bills
-  const totalSales = useMemo(
-    () =>
-      bills.reduce(
-        (sum, bill) => sum + (Number(bill.total) || 0),
-        0
-      ),
-    [bills]
-  );
+  };
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat("en-IN", {
@@ -68,23 +112,70 @@ const Billinghistory = () => {
       maximumFractionDigits: 2,
     }).format(Number(amount) || 0);
 
-  const formatDate = (date) => {
-    if (!date) return "Date unavailable";
+  // Number of days in the currently selected month.
+  const daysInMonth = new Date(Number(year), Number(month), 0).getDate();
 
-    const parsedDate = new Date(date);
+  const days = Array.from({ length: daysInMonth }, (_, index) => index + 1);
 
-    if (Number.isNaN(parsedDate.getTime())) return "Date unavailable";
+  // Apply day filter and search, sort newest first, then keep 10 bills.
+  const filteredBills = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
 
-    return parsedDate.toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
+    return bills
+      .filter((bill) => {
+        const dateKey = getDateKey(bill.issueDate);
+
+        // Make sure the bill belongs to the selected month/year.
+        const monthPrefix = `${year}-${String(month).padStart(2, "0")}`;
+
+        if (!dateKey || !dateKey.startsWith(monthPrefix)) {
+          return false;
+        }
+
+        // If a day is selected, show only that day.
+        if (
+          selectedDay &&
+          Number(dateKey.split("-")[2]) !== Number(selectedDay)
+        ) {
+          return false;
+        }
+
+        // Search by invoice number or client name.
+        const invoiceNumber = String(bill.invoiceNumber ?? "").toLowerCase();
+
+        const clientName = String(bill.client?.clientname ?? "").toLowerCase();
+
+        return invoiceNumber.includes(term) || clientName.includes(term);
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.issueDate).getTime() || 0;
+        const dateB = new Date(b.issueDate).getTime() || 0;
+
+        // Latest date/time first.
+        if (dateA !== dateB) return dateB - dateA;
+
+        // Tie-breaker for bills on the same date.
+        const createdA = new Date(a.createdAt).getTime() || 0;
+        const createdB = new Date(b.createdAt).getTime() || 0;
+
+        return createdB - createdA;
+      })
+      .slice(0, 10);
+  }, [bills, month, year, selectedDay, searchTerm]);
+
+  // Period summaries are based on all bills loaded for the selected month.
+  const totalSales = useMemo(
+    () => bills.reduce((sum, bill) => sum + (Number(bill.total) || 0), 0),
+    [bills],
+  );
+
+  const monthName = MONTHS[Number(month) - 1];
+
+  const clearDayFilter = () => setSelectedDay("");
 
   const generatePDF = async () => {
-    if (!bills.length) {
-      alert("There are no bills available to print for this period.");
+    if (!filteredBills.length) {
+      alert("There are no displayed bills available to print.");
       return;
     }
 
@@ -101,11 +192,6 @@ const Billinghistory = () => {
       console.error("PDF Error:", err);
     }
   };
-
-  const monthName = new Date(2000, Number(month) - 1, 1).toLocaleString(
-    "en-IN",
-    { month: "long" }
-  );
 
   return (
     <div className="min-h-screen w-full bg-slate-950 text-white">
@@ -147,7 +233,7 @@ const Billinghistory = () => {
               </h1>
 
               <p className="mt-2 text-sm text-slate-400">
-                View, search, and print your previous invoices.
+                Filter, search, and print your 10 latest invoices.
               </p>
             </div>
 
@@ -158,6 +244,9 @@ const Billinghistory = () => {
               <p className="mt-1 text-lg font-semibold text-amber-400">
                 {monthName} {year}
               </p>
+              {selectedDay && (
+                <p className="mt-1 text-sm text-slate-400">Day {selectedDay}</p>
+              )}
             </div>
           </div>
         </header>
@@ -167,11 +256,12 @@ const Billinghistory = () => {
           <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-lg shadow-black/10">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm text-slate-400">
-                  Invoices This Period
-                </p>
+                <p className="text-sm text-slate-400">Invoices This Period</p>
                 <p className="mt-2 text-3xl font-bold">
                   {loading ? "—" : bills.length}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  All bills for the selected month
                 </p>
               </div>
 
@@ -202,14 +292,12 @@ const Billinghistory = () => {
           <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-lg shadow-black/10">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm text-slate-400">
-                  Total Billed Amount
-                </p>
+                <p className="text-sm text-slate-400">Total Billed Amount</p>
                 <p className="mt-2 break-words text-2xl font-bold text-amber-400 sm:text-3xl">
                   {loading ? "—" : formatCurrency(totalSales)}
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  Based on all invoices in this period
+                  All invoices for {monthName} {year}
                 </p>
               </div>
 
@@ -233,23 +321,24 @@ const Billinghistory = () => {
           </div>
         </section>
 
-        {/* Search and Period Controls */}
+        {/* Filters */}
         <section className="mb-8 rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow-xl sm:p-6">
           <div className="mb-5">
             <h2 className="text-lg font-semibold">Find Invoices</h2>
             <p className="mt-1 text-sm text-slate-400">
-              Choose a billing period or search by invoice number or client.
+              Filter by day, month, and year, or search by invoice number or
+              client name.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:items-end">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {/* Search */}
             <div className="lg:col-span-2">
               <label
                 htmlFor="billing-search"
                 className="mb-2 block text-sm font-medium text-slate-300"
               >
-                Search
+                Search Invoice or Client
               </label>
 
               <div className="relative">
@@ -262,10 +351,7 @@ const Billinghistory = () => {
                   className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500"
                 >
                   <circle cx="10.5" cy="10.5" r="6.5" />
-                  <path
-                    strokeLinecap="round"
-                    d="m15.5 15.5 5 5"
-                  />
+                  <path strokeLinecap="round" d="m15.5 15.5 5 5" />
                 </svg>
 
                 <input
@@ -277,6 +363,30 @@ const Billinghistory = () => {
                   className="w-full rounded-xl border border-slate-700 bg-slate-950 py-3 pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/10"
                 />
               </div>
+            </div>
+
+            {/* Day Number */}
+            <div>
+              <label
+                htmlFor="billing-day"
+                className="mb-2 block text-sm font-medium text-slate-300"
+              >
+                Date (Day Number)
+              </label>
+
+              <select
+                id="billing-day"
+                value={selectedDay}
+                onChange={(e) => setSelectedDay(e.target.value)}
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-white outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/10"
+              >
+                <option value="">All Days</option>
+                {days.map((day) => (
+                  <option key={day} value={String(day)}>
+                    {day}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Month */}
@@ -291,22 +401,17 @@ const Billinghistory = () => {
               <select
                 id="billing-month"
                 value={month}
-                onChange={(e) => setMonth(Number(e.target.value))}
+                onChange={(e) => {
+                  setMonth(Number(e.target.value));
+                  setSelectedDay("");
+                }}
                 className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-white outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/10"
               >
-                {Array.from({ length: 12 }, (_, index) => {
-                  const value = index + 1;
-                  const label = new Date(2000, index, 1).toLocaleString(
-                    "en-IN",
-                    { month: "long" }
-                  );
-
-                  return (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  );
-                })}
+                {MONTHS.map((label, index) => (
+                  <option key={label} value={index + 1}>
+                    {label}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -319,64 +424,83 @@ const Billinghistory = () => {
                 Year
               </label>
 
-              <input
+              <select
                 id="billing-year"
-                type="number"
-                min="2000"
-                max="2100"
                 value={year}
-                onChange={(e) => setYear(Number(e.target.value))}
+                onChange={(e) => {
+                  setYear(Number(e.target.value));
+                  setSelectedDay("");
+                }}
                 className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-white outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/10"
-              />
+              >
+                {Array.from(
+                  { length: 10 },
+                  (_, index) => currentDate.getFullYear() - index,
+                ).map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
           <div className="mt-5 flex flex-col gap-3 border-t border-slate-800 pt-5 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-slate-400">
+            <div className="text-sm text-slate-400">
               Showing{" "}
               <span className="font-semibold text-white">
                 {loading ? "…" : filteredBills.length}
               </span>{" "}
-              of{" "}
-              <span className="font-semibold text-white">{bills.length}</span>{" "}
-              invoices
-            </p>
+              of the latest 10 matching invoices
+            </div>
 
-            <button
-              type="button"
-              onClick={generatePDF}
-              disabled={loading || bills.length === 0}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-400 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-amber-950/20 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                className="h-5 w-5"
+            <div className="flex flex-wrap gap-3">
+              {selectedDay && (
+                <button
+                  type="button"
+                  onClick={clearDayFilter}
+                  className="rounded-xl border border-slate-700 px-4 py-3 text-sm font-semibold text-slate-300 transition hover:border-amber-400 hover:text-amber-300"
+                >
+                  Clear Day Filter
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={generatePDF}
+                disabled={loading || filteredBills.length === 0}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-400 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-amber-950/20 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M7 8V3.75h10V8M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M7 14h10v6.25H7zM17 11.5h.01"
-                />
-              </svg>
-              Print Billing History
-            </button>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  className="h-5 w-5"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M7 8V3.75h10V8M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M7 14h10v6.25H7zM17 11.5h.01"
+                  />
+                </svg>
+                Print Displayed Bills
+              </button>
+            </div>
           </div>
         </section>
 
-        {/* Hidden Invoice Print Content */}
+        {/* Hidden print content: only the displayed invoices */}
         <div className="hidden">
           <div id="invoice-content">
-            {bills.map((cur, idx) => (
-              <InvoicePrint key={cur._id || idx} invoiceData={cur} />
+            {filteredBills.map((bill, index) => (
+              <InvoicePrint key={bill._id || index} invoiceData={bill} />
             ))}
           </div>
         </div>
@@ -385,9 +509,11 @@ const Billinghistory = () => {
         <section>
           <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-xl font-bold">Invoices</h2>
+              <h2 className="text-xl font-bold">Latest Invoices</h2>
               <p className="mt-1 text-sm text-slate-400">
-                Billing records for {monthName} {year}
+                {selectedDay
+                  ? `Bills for ${selectedDay} ${monthName} ${year}`
+                  : `Latest 10 bills for ${monthName} ${year}`}
               </p>
             </div>
           </div>
@@ -407,23 +533,7 @@ const Billinghistory = () => {
               <p className="font-semibold text-red-300">{error}</p>
               <button
                 type="button"
-                onClick={() => {
-                  setMonth((current) => current);
-                  setYear((current) => current);
-                  // Retry the current request without changing the API.
-                  axios
-                    .get(`/api/bill?month=${month}&year=${year}`)
-                    .then((res) => {
-                      setBills(res.data.data || []);
-                      setError("");
-                    })
-                    .catch((e) => {
-                      console.error(e);
-                      setError(
-                        "Unable to load billing history. Please try again."
-                      );
-                    });
-                }}
+                onClick={() => setRetryCount((count) => count + 1)}
                 className="mt-4 rounded-lg border border-red-400/30 px-4 py-2 text-sm font-semibold text-red-200 transition hover:bg-red-400/10"
               >
                 Try Again
@@ -447,9 +557,9 @@ const Billinghistory = () => {
                     </thead>
 
                     <tbody className="divide-y divide-slate-800">
-                      {filteredBills.map((bill, idx) => (
+                      {filteredBills.map((bill, index) => (
                         <tr
-                          key={bill._id || idx}
+                          key={bill._id || index}
                           className="transition hover:bg-slate-800/50"
                         >
                           <td className="px-6 py-4">
@@ -475,6 +585,7 @@ const Billinghistory = () => {
                                   />
                                 </svg>
                               </div>
+
                               <span className="font-semibold text-white">
                                 #{bill.invoiceNumber}
                               </span>
@@ -503,11 +614,11 @@ const Billinghistory = () => {
                 </div>
               </div>
 
-              {/* Mobile Invoice Cards */}
+              {/* Mobile Cards */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:hidden">
-                {filteredBills.map((bill, idx) => (
+                {filteredBills.map((bill, index) => (
                   <article
-                    key={bill._id || idx}
+                    key={bill._id || index}
                     className="rounded-2xl border border-slate-800 bg-slate-900 p-5 transition hover:border-amber-400/30"
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -553,15 +664,11 @@ const Billinghistory = () => {
                         {bill.client?.clientname || "Unknown Client"}
                       </p>
 
-                      <div className="mt-4 flex items-end justify-between gap-3">
-                        <div>
-                          <p className="text-xs text-slate-500">
-                            Invoice Total
-                          </p>
-                          <p className="mt-1 text-xl font-bold text-amber-400">
-                            {formatCurrency(bill.total)}
-                          </p>
-                        </div>
+                      <div className="mt-4">
+                        <p className="text-xs text-slate-500">Invoice Total</p>
+                        <p className="mt-1 text-xl font-bold text-amber-400">
+                          {formatCurrency(bill.total)}
+                        </p>
                       </div>
                     </div>
                   </article>
@@ -597,25 +704,27 @@ const Billinghistory = () => {
               </h3>
 
               <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
-                {searchTerm
-                  ? "No invoices match your search. Try another invoice number or client name."
+                {searchTerm || selectedDay
+                  ? "No invoices match the selected date or search. Try changing your filters."
                   : `There are no billing records for ${monthName} ${year}.`}
               </p>
 
-              {searchTerm && (
+              {(searchTerm || selectedDay) && (
                 <button
                   type="button"
-                  onClick={() => setSearchTerm("")}
+                  onClick={() => {
+                    setSearchTerm("");
+                    setSelectedDay("");
+                  }}
                   className="mt-5 rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-amber-400 transition hover:bg-slate-800"
                 >
-                  Clear Search
+                  Clear Filters
                 </button>
               )}
             </div>
           )}
         </section>
 
-        {/* Footer */}
         <footer className="mt-10 border-t border-slate-800 py-5 text-center text-xs text-slate-500">
           Gurukrupa Agency · Billing History
         </footer>
