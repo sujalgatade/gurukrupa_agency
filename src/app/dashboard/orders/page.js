@@ -139,9 +139,8 @@ const Orders = () => {
       if (selectedDay && billDay !== Number(selectedDay)) return;
 
       const items = Array.isArray(bill.items) ? bill.items : [];
-
       items.forEach((item) => {
-        const productName = item.description;
+        const productName = item.itemname;
         const key = `${dateKey}__${productName.toLowerCase()}`;
 
         if (!summary.has(key)) {

@@ -1,16 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import axios from "axios";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
-const DUMMY_API = "https://jsonplaceholder.typicode.com/posts";
+const DUMMY_API = "http://localhost:3000/api";
 
 const createEmptyRow = () => ({
   id: `${Date.now()}-${Math.random()}`,
   date: new Date().toISOString().split("T")[0],
-  itemName: "",
+  itemname: "",
   rate: "",
-  itemQuantity: "",
-  boxQuantity: "",
+  itemperbox: "",
+  box: "",
 });
 
 const money = (value) =>
@@ -22,7 +24,7 @@ const money = (value) =>
 
 const getBuyingPricePerItem = (row) => {
   const rate = Number(row.rate) || 0;
-  const quantity = Number(row.itemQuantity) || 0;
+  const quantity = Number(row.itemperbox) || 0;
 
   if (quantity <= 0) return 0;
 
@@ -31,7 +33,7 @@ const getBuyingPricePerItem = (row) => {
 
 const getTotalBuyingValue = (row) => {
   const rate = Number(row.rate) || 0;
-  const boxes = Number(row.boxQuantity) || 0;
+  const boxes = Number(row.box) || 0;
 
   return rate * 1.05 * boxes;
 };
@@ -41,16 +43,34 @@ export default function BuyAddPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState(null);
   const [submittedData, setSubmittedData] = useState(null);
-
+  const router = useRouter();
+  useEffect(() => {
+    const fetchItem = async () => {
+      try {
+        let { data } = await axios.get(
+          "http://localhost:3000/api/items?unique=true",
+        );
+        data = data["data"];
+        data = data.map((cur) => ({
+          ...cur,
+          id: `${Date.now()}-${Math.random()}`,
+        }));
+        setRows(data);
+      } catch (e) {
+        console.log(e);
+      }
+    };
+    fetchItem();
+  }, []);
   const completedRows = useMemo(
     () =>
       rows.filter(
         (row) =>
-          row.itemName.trim() &&
+          row.itemname.trim() &&
           row.date &&
           row.rate !== "" &&
-          row.itemQuantity !== "" &&
-          row.boxQuantity !== "",
+          row.itemperbox !== "" &&
+          row.box !== "",
       ),
     [rows],
   );
@@ -61,11 +81,7 @@ export default function BuyAddPage() {
   );
 
   const totalBoxes = useMemo(
-    () =>
-      completedRows.reduce(
-        (sum, row) => sum + (Number(row.boxQuantity) || 0),
-        0,
-      ),
+    () => completedRows.reduce((sum, row) => sum + (Number(row.box) || 0), 0),
     [completedRows],
   );
 
@@ -105,8 +121,8 @@ export default function BuyAddPage() {
     const invalidRow = completedRows.find(
       (row) =>
         Number(row.rate) < 0 ||
-        Number(row.itemQuantity) <= 0 ||
-        Number(row.boxQuantity) < 0,
+        Number(row.itemperbox) <= 0 ||
+        Number(row.box) < 0,
     );
 
     if (invalidRow) {
@@ -135,19 +151,18 @@ export default function BuyAddPage() {
       totalBuyingValue: Number(totalBuyingValue.toFixed(2)),
       items: completedRows.map((row) => ({
         date: row.date,
-        itemName: row.itemName.trim(),
+        itemname: row.itemname.trim(),
         rate: Number(row.rate),
-        itemQuantity: Number(row.itemQuantity),
-        boxQuantity: Number(row.boxQuantity),
-        buyingPricePerItem: Number(getBuyingPricePerItem(row).toFixed(2)),
+        itemperbox: Number(row.itemperbox),
+        box: Number(row.box),
+        originalrate: Number(getBuyingPricePerItem(row).toFixed(2)),
         totalBuyingValue: Number(getTotalBuyingValue(row).toFixed(2)),
       })),
     };
 
     setIsSubmitting(true);
-
     try {
-      const response = await fetch(DUMMY_API, {
+      const response = await fetch("http://localhost:3000/api/buy-bill", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -162,6 +177,7 @@ export default function BuyAddPage() {
       const result = await response.json();
 
       setSubmittedData(result);
+      router.push("/dashboard");
       setMessage({
         type: "success",
         text: `Demo submission successful! Dummy API returned ID: ${result.id}.`,
@@ -291,9 +307,9 @@ export default function BuyAddPage() {
                       <td className="px-4 py-4">
                         <input
                           type="text"
-                          value={row.itemName}
+                          value={row.itemname}
                           onChange={(e) =>
-                            updateRow(row.id, "itemName", e.target.value)
+                            updateRow(row.id, "itemname", e.target.value)
                           }
                           placeholder="Enter item name"
                           required
@@ -321,9 +337,9 @@ export default function BuyAddPage() {
                           type="number"
                           min="1"
                           step="1"
-                          value={row.itemQuantity}
+                          value={row.itemperbox}
                           onChange={(e) =>
-                            updateRow(row.id, "itemQuantity", e.target.value)
+                            updateRow(row.id, "itemperbox", e.target.value)
                           }
                           placeholder="0"
                           required
@@ -336,9 +352,9 @@ export default function BuyAddPage() {
                           type="number"
                           min="0"
                           step="1"
-                          value={row.boxQuantity}
+                          value={row.box}
                           onChange={(e) =>
-                            updateRow(row.id, "boxQuantity", e.target.value)
+                            updateRow(row.id, "box", e.target.value)
                           }
                           placeholder="0"
                           required
@@ -413,9 +429,9 @@ export default function BuyAddPage() {
                     <label className="text-xs text-slate-400">Item Name</label>
                     <input
                       type="text"
-                      value={row.itemName}
+                      value={row.itemname}
                       onChange={(e) =>
-                        updateRow(row.id, "itemName", e.target.value)
+                        updateRow(row.id, "itemname", e.target.value)
                       }
                       placeholder="Enter item name"
                       required
@@ -448,9 +464,9 @@ export default function BuyAddPage() {
                         type="number"
                         min="1"
                         step="1"
-                        value={row.itemQuantity}
+                        value={row.itemperbox}
                         onChange={(e) =>
-                          updateRow(row.id, "itemQuantity", e.target.value)
+                          updateRow(row.id, "itemperbox", e.target.value)
                         }
                         placeholder="0"
                         required
@@ -466,9 +482,9 @@ export default function BuyAddPage() {
                         type="number"
                         min="0"
                         step="1"
-                        value={row.boxQuantity}
+                        value={row.box}
                         onChange={(e) =>
-                          updateRow(row.id, "boxQuantity", e.target.value)
+                          updateRow(row.id, "box", e.target.value)
                         }
                         placeholder="0"
                         required

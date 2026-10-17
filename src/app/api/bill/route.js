@@ -1,6 +1,7 @@
 import dbConnect from "@/lib/db";
 import Bill from "@/models/Bill";
 import Client from "@/models/Client";
+import Item from "@/models/Item";
 export const GET = async (req) => {
   const { searchParams } = new URL(req.url);
   const client = searchParams.get("client");
@@ -15,14 +16,13 @@ export const GET = async (req) => {
       const res = await Bill.find({
         client,
       }).populate("client");
-      console.log(clientname, address, res);
       return Response.json(
         {
           message: "Bills fetched successfully",
           success: true,
           data: res,
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
     if (id) {
@@ -33,7 +33,7 @@ export const GET = async (req) => {
             success: false,
             message: "Bill not found",
           },
-          { status: 404 }
+          { status: 404 },
         );
       }
       return Response.json(
@@ -42,7 +42,7 @@ export const GET = async (req) => {
           success: true,
           data: res,
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
     if (monthParam && yearParam) {
@@ -63,7 +63,7 @@ export const GET = async (req) => {
             success: false,
             message: "No bills found for this month",
           },
-          { status: 404 }
+          { status: 404 },
         );
       }
       return Response.json(
@@ -72,7 +72,7 @@ export const GET = async (req) => {
           success: true,
           data: res,
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
     if (today) {
@@ -95,7 +95,7 @@ export const GET = async (req) => {
             success: false,
             message: "No bills found for this date",
           },
-          { status: 404 }
+          { status: 404 },
         );
       }
       return Response.json(
@@ -104,7 +104,7 @@ export const GET = async (req) => {
           success: true,
           data: res,
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
     if (paymentStatus) {
@@ -116,7 +116,7 @@ export const GET = async (req) => {
             success: false,
             message: "No bills found for this payment status",
           },
-          { status: 404 }
+          { status: 404 },
         );
       }
       return Response.json(
@@ -125,7 +125,7 @@ export const GET = async (req) => {
           success: true,
           data: res,
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
     const res = await Bill.find({}).sort({ createdAt: -1 }).populate("client");
@@ -135,13 +135,13 @@ export const GET = async (req) => {
         success: true,
         data: res,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.log(error);
     return Response.json(
       { success: false, message: "Internal Server Error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 };
@@ -157,6 +157,7 @@ export const POST = async (req) => {
     isPaid,
     taxRate,
   } = await req.json();
+
   try {
     await dbConnect();
     const bill = await Bill.findOne({ invoiceNumber });
@@ -168,9 +169,32 @@ export const POST = async (req) => {
         },
         {
           status: 400,
-        }
+        },
       );
     }
+    let profit = 0;
+    for (const element of items) {
+      let temp = element.boxQty;
+      const res = await Item.find({
+        itemname: element.itemname,
+        itemperbox: element.quantity,
+      }).sort({ date: 1, _id: 1 });
+
+      for (const ele of res) {
+        if (temp <= 0) break;
+
+        const deduct = Math.min(ele.box, temp);
+
+        profit +=
+          (element.originalRate - ele.originalrate) * element.quantity * deduct;
+
+        ele.box -= deduct;
+        temp -= deduct;
+
+        await ele.save();
+      }
+    }
+    // await Item.deleteMany({ box: 0 });
     const newBill = new Bill({
       client,
       invoiceNumber,
@@ -181,6 +205,7 @@ export const POST = async (req) => {
       total,
       isPaid,
       taxRate,
+      profit,
     });
     await newBill.save();
     return Response.json(
@@ -191,13 +216,13 @@ export const POST = async (req) => {
       },
       {
         status: 201,
-      }
+      },
     );
   } catch (error) {
     console.log(error);
     return Response.json(
       { success: false, message: "Internal Server Error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 };
@@ -207,7 +232,7 @@ export const PUT = async (req) => {
   if (!id) {
     return Response.json(
       { success: false, message: "Bill ID is required" },
-      { status: 400 }
+      { status: 400 },
     );
   }
   try {
@@ -215,12 +240,12 @@ export const PUT = async (req) => {
     const res = await Bill.findByIdAndUpdate(
       id,
       { isPaid: true },
-      { new: true }
+      { new: true },
     );
     if (!res) {
       return Response.json(
         { success: false, message: "Bill not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
     return Response.json(
@@ -229,13 +254,13 @@ export const PUT = async (req) => {
         message: "Bill updated successfully",
         data: res,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.log(error);
     return Response.json(
       { success: false, message: "Internal Server Error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 };

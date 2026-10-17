@@ -1,4 +1,3 @@
-
 "use client";
 
 import axios from "axios";
@@ -7,7 +6,7 @@ import { useState, useEffect } from "react";
 const CreateBill = () => {
   const [items, setItems] = useState([
     {
-      description: "",
+      id: "",
       quantity: 0,
       boxQty: 0,
       rate: 0,
@@ -42,9 +41,7 @@ const CreateBill = () => {
           setClients(res.data.data);
           setFilteredClients(res.data.data);
 
-          const add = [
-            ...new Set(res.data.data.map((c) => c.address)),
-          ];
+          const add = [...new Set(res.data.data.map((c) => c.address))];
 
           setAddress(add);
         }
@@ -55,8 +52,7 @@ const CreateBill = () => {
 
     const fetchItems = async () => {
       try {
-        const res = await axios.get("/api/items");
-
+        const res = await axios.get("/api/items?unique=true&bill=true");
         if (res.data?.data) {
           setItemOptions(res.data.data);
         }
@@ -83,9 +79,7 @@ const CreateBill = () => {
 
   // Update client selection
   useEffect(() => {
-    const clientData = clients.find(
-      (c) => c.clientname === clientname
-    );
+    const clientData = clients.find((c) => c.clientname === clientname);
 
     setClient(clientData ? clientData._id : null);
     setClientAddress(clientData ? clientData.address : "");
@@ -96,9 +90,7 @@ const CreateBill = () => {
     if (!clientaddress) {
       setFilteredClients(clients);
     } else {
-      setFilteredClients(
-        clients.filter((c) => c.address === clientaddress)
-      );
+      setFilteredClients(clients.filter((c) => c.address === clientaddress));
     }
   }, [clientaddress, clients]);
 
@@ -107,16 +99,13 @@ const CreateBill = () => {
     const updatedItems = items.map((item) => {
       const origRate = item.originalRate;
 
-      const newRate =
-        taxRate > 0
-          ? origRate / (1 + taxRate / 100)
-          : origRate;
+      const newRate = taxRate > 0 ? origRate / (1 + taxRate / 100) : origRate;
 
       return {
         ...item,
         rate: parseFloat(newRate.toFixed(2)),
         originalRate: origRate,
-        amount: (item.quantity || 0) * newRate,
+        amount: (item.quantity || 0) * newRate * item.box,
       };
     });
 
@@ -141,21 +130,43 @@ const CreateBill = () => {
   }, [items, taxRate]);
 
   // Handle item input changes
+
   const handleChange = (index, field, value) => {
     const updated = [...items];
 
-    updated[index] = {
-      ...updated[index],
-      [field]: value,
-    };
+    if (field === "id") {
+      const selectedItem = itemOptions.find((cur) => cur._id === value);
+
+      if (!selectedItem) return;
+
+      updated[index] = {
+        ...updated[index],
+        id: selectedItem._id, // Store ID for dropdown
+        itemname: selectedItem.itemname, // Keep product name
+        box: selectedItem.box,
+        quantity: selectedItem.itemperbox || 0,
+        originalRate: selectedItem.originalrate || 0,
+        rate: selectedItem.originalrate || 0,
+      };
+    } else {
+      updated[index] = {
+        ...updated[index],
+        [field]: value,
+      };
+    }
+
+    if (field === "boxQty" && updated[index].box !== undefined) {
+      updated[index].boxQty = Math.min(Number(value) || 0, updated[index].box);
+    }
 
     if (field === "rate") {
-      updated[index].originalRate = value;
+      updated[index].originalRate = Number(value) || 0;
     }
 
     updated[index].amount =
-      (parseFloat(updated[index].quantity) || 0) *
-      (parseFloat(updated[index].rate) || 0);
+      (Number(updated[index].quantity) || 0) *
+      (Number(updated[index].rate) || 0) *
+      Number(updated[index].boxQty);
 
     setItems(updated);
   };
@@ -174,7 +185,7 @@ const CreateBill = () => {
     setItems([
       ...items,
       {
-        description: "",
+        id: "",
         quantity: 0,
         boxQty: 0,
         rate: 0,
@@ -193,7 +204,7 @@ const CreateBill = () => {
   // Submit invoice
   const handleSubmit = async () => {
     const filteredItems = items.filter(
-      (item) => item.description && item.amount > 0
+      (item) => item.id && item.amount > 0,
     );
 
     if (!client || !issueDate) {
@@ -217,7 +228,6 @@ const CreateBill = () => {
 
       console.log(res.data);
       alert("Invoice created successfully!");
-      
     } catch (error) {
       console.error("Error creating invoice:", error);
       alert("Failed to create invoice. Check console for details.");
@@ -229,8 +239,7 @@ const CreateBill = () => {
   const inputClass =
     "w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20";
 
-  const labelClass =
-    "mb-2 block text-sm font-medium text-slate-300";
+  const labelClass = "mb-2 block text-sm font-medium text-slate-300";
 
   const formatCurrency = (value) =>
     `₹${Number(value || 0).toLocaleString("en-IN", {
@@ -267,12 +276,8 @@ const CreateBill = () => {
               ₹
             </div>
             <div>
-              <p className="text-xs text-slate-400">
-                Invoice Number
-              </p>
-              <p className="font-bold text-white">
-                #{invoiceNumber}
-              </p>
+              <p className="text-xs text-slate-400">Invoice Number</p>
+              <p className="font-bold text-white">#{invoiceNumber}</p>
             </div>
           </div>
         </div>
@@ -287,8 +292,8 @@ const CreateBill = () => {
               Invoice Details
             </h2>
             <p className="mt-1 text-sm text-slate-400">
-              Enter client information, add products, and review
-              the invoice total.
+              Enter client information, add products, and review the invoice
+              total.
             </p>
           </div>
 
@@ -319,9 +324,7 @@ const CreateBill = () => {
 
           <div className="grid grid-cols-1 gap-5 p-5 sm:grid-cols-2 sm:p-7 lg:grid-cols-3">
             <div>
-              <label className={labelClass}>
-                Invoice Number
-              </label>
+              <label className={labelClass}>Invoice Number</label>
               <input
                 type="text"
                 value={invoiceNumber}
@@ -392,9 +395,7 @@ const CreateBill = () => {
               </div>
 
               <div>
-                <h2 className="font-semibold text-white">
-                  Invoice Items
-                </h2>
+                <h2 className="font-semibold text-white">Invoice Items</h2>
                 <p className="mt-1 text-xs text-slate-400">
                   Add products, quantities, and rates.
                 </p>
@@ -441,31 +442,25 @@ const CreateBill = () => {
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
                   {/* Description */}
                   <div className="sm:col-span-2 lg:col-span-4">
-                    <label className={labelClass}>
-                      Product Description
-                    </label>
+                    <label className={labelClass}>Product Description</label>
+
                     <select
-                      value={item.description}
-                      onChange={(e) =>
-                        handleChange(
-                          idx,
-                          "description",
-                          e.target.value
-                        )
-                      }
+                      value={item.id}
+                      onChange={(e) => handleChange(idx, "id", e.target.value)}
                       className={inputClass}
                     >
                       <option value="">Select item</option>
+
                       {itemOptions.map((opt) => (
-                        <option key={opt._id} value={opt.itemname}>
-                          {opt.itemname}
+                        <option key={opt._id} value={opt._id}>
+                          {`${opt.itemname} X ${opt.itemperbox}`}
                         </option>
                       ))}
                     </select>
                   </div>
 
                   {/* Quantity */}
-                  <div className="lg:col-span-2">
+                  {/* <div className="lg:col-span-2">
                     <label className={labelClass}>Quantity</label>
                     <input
                       type="number"
@@ -476,13 +471,13 @@ const CreateBill = () => {
                         handleChange(
                           idx,
                           "quantity",
-                          parseFloat(e.target.value) || 0
+                          parseFloat(e.target.value) || 0,
                         )
                       }
                       className={inputClass}
                       placeholder="0"
                     />
-                  </div>
+                  </div> */}
 
                   {/* Box quantity */}
                   <div className="lg:col-span-2">
@@ -495,7 +490,7 @@ const CreateBill = () => {
                         handleChange(
                           idx,
                           "boxQty",
-                          parseFloat(e.target.value) || 0
+                          parseFloat(e.target.value) || 0,
                         )
                       }
                       className={inputClass}
@@ -505,9 +500,7 @@ const CreateBill = () => {
 
                   {/* Rate */}
                   <div className="lg:col-span-2">
-                    <label className={labelClass}>
-                      Rate (₹)
-                    </label>
+                    <label className={labelClass}>Rate (₹)</label>
                     <input
                       type="number"
                       min="0"
@@ -518,7 +511,7 @@ const CreateBill = () => {
                         handleChange(
                           idx,
                           "rate",
-                          parseFloat(e.target.value) || 0
+                          parseFloat(e.target.value) || 0,
                         )
                       }
                       className={inputClass}
@@ -538,9 +531,7 @@ const CreateBill = () => {
             ))}
 
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-slate-700 px-4 py-4">
-              <p className="text-sm text-slate-400">
-                Total line items
-              </p>
+              <p className="text-sm text-slate-400">Total line items</p>
               <p className="font-semibold text-white">
                 {items.length} {items.length === 1 ? "item" : "items"}
               </p>
@@ -557,9 +548,7 @@ const CreateBill = () => {
               </div>
 
               <div>
-                <h2 className="font-semibold text-white">
-                  Invoice Summary
-                </h2>
+                <h2 className="font-semibold text-white">Invoice Summary</h2>
                 <p className="mt-1 text-xs text-slate-400">
                   Review tax and payable amount.
                 </p>
@@ -570,9 +559,7 @@ const CreateBill = () => {
           <div className="grid grid-cols-1 gap-6 p-5 sm:p-7 lg:grid-cols-2">
             {/* Tax settings */}
             <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-5">
-              <label className={labelClass}>
-                Tax Rate (%)
-              </label>
+              <label className={labelClass}>Tax Rate (%)</label>
               <input
                 type="number"
                 min="0"
@@ -583,8 +570,8 @@ const CreateBill = () => {
                 className={inputClass}
               />
               <p className="mt-3 text-xs leading-5 text-slate-500">
-                Tax is calculated using your existing subtotal and
-                tax-rate logic.
+                Tax is calculated using your existing subtotal and tax-rate
+                logic.
               </p>
             </div>
 
@@ -600,9 +587,7 @@ const CreateBill = () => {
               </div>
 
               <div className="flex items-center justify-between gap-4">
-                <span className="text-sm text-slate-400">
-                  Tax ({taxRate}%)
-                </span>
+                <span className="text-sm text-slate-400">Tax ({taxRate}%)</span>
                 <span className="font-medium text-white">
                   {formatCurrency(taxAmount)}
                 </span>
@@ -636,8 +621,7 @@ const CreateBill = () => {
                 Ready to create your invoice?
               </h2>
               <p className="mt-1 text-sm text-slate-400">
-                Verify the client, items, and final amount before
-                saving.
+                Verify the client, items, and final amount before saving.
               </p>
             </div>
 
@@ -663,8 +647,8 @@ const CreateBill = () => {
                 {isLoading
                   ? "Saving Invoice..."
                   : isEditing
-                  ? "Update Invoice"
-                  : "Create Invoice"}
+                    ? "Update Invoice"
+                    : "Create Invoice"}
               </button>
             </div>
           </div>

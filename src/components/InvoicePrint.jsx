@@ -92,7 +92,7 @@ const InvoicePrint = ({ invoiceData }) => {
           </h3>
 
           <p style={{ fontSize: "14px", fontWeight: "600", margin: "6px 0" }}>
-            Invoice #: {invoiceData?.invoiceNumber || "-"}
+            Invoice Number : {invoiceData?.invoiceNumber || "-"}
           </p>
 
           <p style={{ fontSize: "13px", margin: "6px 0" }}>
@@ -105,17 +105,29 @@ const InvoicePrint = ({ invoiceData }) => {
       </div>
 
       {/* Customer Information */}
-      <div style={{ marginBottom: "32px" }}>
-        <h3 style={{ fontWeight: "600", marginBottom: "8px" }}>
+      <div style={{ marginBottom: "32px",fontSize: "12px" }}>
+        <h3 style={{ fontWeight: "600", marginBottom: "8px",fontSize:"14px" }}>
           Bill To:
         </h3>
 
-        <p style={{ margin: "4px 0" }}>
+        <p style={{ margin: "2px 0" }}>
+          <strong>Name : </strong>
           {invoiceData?.client?.clientname || "-"}
         </p>
 
         <p style={{ margin: "4px 0", whiteSpace: "pre-line" }}>
+          <strong>Address : </strong>
           {invoiceData?.client?.address || "-"}
+        </p>
+        <p style={{ margin: "4px 0", whiteSpace: "pre-line" }}>
+          <strong>GSTN Number : </strong>
+          {invoiceData?.client?.gstNumber
+ || "-"}
+        </p>
+        <p style={{ margin: "4px 0", whiteSpace: "pre-line" }}>
+          <strong>Contact : </strong>
+          {invoiceData?.client?.phone
+ || "-"}
         </p>
       </div>
 
@@ -189,7 +201,7 @@ const InvoicePrint = ({ invoiceData }) => {
                   padding: "8px",
                 }}
               >
-                {item.description}
+                {item.itemname}
               </td>
 
               <td

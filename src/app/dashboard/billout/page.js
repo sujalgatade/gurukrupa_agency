@@ -15,6 +15,7 @@ function Billout() {
     useEffect(() => {
         const fetchBill = async () => {
             const res = await axios.get(`/api/bill?id=${id}`);
+            console.log(res.data.data)
             setInvoiceData(res.data.data);
         };
         if (id) fetchBill();

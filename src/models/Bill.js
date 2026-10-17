@@ -10,12 +10,13 @@ const billSchema = new Schema({
   issueDate: { type: Date, required: true },
   items: [
     {
-      description: { type: String, required: true },
+      id: { type: mongoose.Schema.Types.ObjectId, ref: "Item" },
       quantity: { type: Number, required: true },
       rate: { type: Number, required: true },
       originalRate: { type: Number, required: true },
       amount: { type: Number, required: true },
       boxQty: { type: Number, required: true },
+      itemname: { type: String, required: true },
     },
   ],
   isPaid: { type: Boolean, default: false },
@@ -30,6 +31,10 @@ const billSchema = new Schema({
   createdAt: {
     type: Date,
     default: Date.now,
+  },
+  profit: {
+    type: Number,
+    default: 0,
   },
 });
 const Bill = mongoose.models.Bill || mongoose.model("Bill", billSchema);

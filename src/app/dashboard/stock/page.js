@@ -39,6 +39,7 @@ const getProductName = (purchase) =>
   "Unnamed Product";
 
 const getItemQuantity = (purchase) =>
+  purchase?.itemperbox ??
   purchase?.itemQty ??
   purchase?.itemQuantity ??
   purchase?.itemqty ??
@@ -57,6 +58,7 @@ const getBoxQuantity = (purchase) =>
   0;
 
 const getBuyingRate = (purchase) =>
+  purchase?.originalrate??
   purchase?.buyingRatePerItem ??
   purchase?.buyingPricePerItem ??
   purchase?.buyingRate ??
@@ -141,13 +143,13 @@ const PurchaseHistory = () => {
 
     try {
       // Fetch purchase records from your existing buy API route.
-      const response = await axios.get("/api/buy", {
+      const response = await axios.get("/api/items", {
         params: {
           month,
           year,
         },
       });
-
+      console.log(response);
       setPurchases(normalizePurchaseResponse(response.data));
     } catch (err) {
       console.error("Error fetching purchase history:", err);
