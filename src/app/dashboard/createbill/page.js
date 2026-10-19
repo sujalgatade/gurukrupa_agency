@@ -1,7 +1,16 @@
 "use client";
 
 import axios from "axios";
+import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import { toast } from "react-toastify";
+import LoadingAnimation from "@/components/LoadingAnimation";
+
+const getLocalDateInputValue = () => {
+  const now = new Date();
+  const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
+  return localDate.toISOString().slice(0, 10);
+};
 
 const CreateBill = () => {
   const [items, setItems] = useState([
@@ -16,34 +25,32 @@ const CreateBill = () => {
   ]);
 
   const [client, setClient] = useState(null);
+  const [selectedAddress, setSelectedAddress] = useState("");
   const [itemOptions, setItemOptions] = useState([]);
   const [clients, setClients] = useState([]);
-  const [address, setAddress] = useState([]);
-  const [filteredClients, setFilteredClients] = useState([]);
-  const [clientname, setClientName] = useState("");
-  const [clientaddress, setClientAddress] = useState("");
   const [invoiceNumber, setInvoiceNumber] = useState(0);
   const [issueDate, setIssueDate] = useState("");
   const [taxRate, setTaxRate] = useState(0);
+  const [discount, setDiscount] = useState(0);
   const [subtotal, setSubtotal] = useState(0);
   const [taxAmount, setTaxAmount] = useState(0);
   const [total, setTotal] = useState(0);
+  const [initialDataLoading, setInitialDataLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [message, setMessage] = useState("");
+  const router = useRouter();
 
   // Fetch clients, items, and next invoice number
   useEffect(() => {
+    setIssueDate(getLocalDateInputValue());
+
     const fetchClients = async () => {
       try {
         const res = await axios.get("/api/client");
 
         if (res.data?.data) {
           setClients(res.data.data);
-          setFilteredClients(res.data.data);
-
-          const add = [...new Set(res.data.data.map((c) => c.address))];
-
-          setAddress(add);
         }
       } catch (error) {
         console.error("Error fetching clients:", error);
@@ -72,43 +79,46 @@ const CreateBill = () => {
       }
     };
 
-    fetchClients();
-    fetchItems();
-    fetchInvoiceNumber();
+    Promise.all([fetchClients(), fetchItems(), fetchInvoiceNumber()]).finally(
+      () => setInitialDataLoading(false),
+    );
   }, []);
 
-  // Update client selection
-  useEffect(() => {
-    const clientData = clients.find((c) => c.clientname === clientname);
-
-    setClient(clientData ? clientData._id : null);
-    setClientAddress(clientData ? clientData.address : "");
-  }, [clientname, clients]);
-
-  // Filter clients by address
-  useEffect(() => {
-    if (!clientaddress) {
-      setFilteredClients(clients);
-    } else {
-      setFilteredClients(clients.filter((c) => c.address === clientaddress));
-    }
-  }, [clientaddress, clients]);
+  const selectedClient = clients.find((entry) => entry._id === client);
+  const clientAddresses = [
+    ...new Map(
+      clients
+        .map((entry) => String(entry.address || "").trim())
+        .filter(Boolean)
+        .map((address) => [address.toLocaleLowerCase("en-IN"), address]),
+    ).values(),
+  ].sort((first, second) => first.localeCompare(second, "en-IN"));
+  const clientsAtSelectedAddress = selectedAddress
+    ? clients.filter(
+        (entry) =>
+          String(entry.address || "")
+            .trim()
+            .toLocaleLowerCase("en-IN") ===
+          selectedAddress.toLocaleLowerCase("en-IN"),
+      )
+    : [];
 
   // Update item rates and amounts when tax rate changes
   useEffect(() => {
+    console.log(items);
     const updatedItems = items.map((item) => {
       const origRate = item.originalRate;
 
       const newRate = taxRate > 0 ? origRate / (1 + taxRate / 100) : origRate;
-
+      console.log(newRate, origRate);
       return {
         ...item,
         rate: parseFloat(newRate.toFixed(2)),
         originalRate: origRate,
-        amount: (item.quantity || 0) * newRate * item.box,
+        amount: (item.quantity || 0) * newRate * item.boxQty,
       };
     });
-
+    console.log(updatedItems);
     setItems(updatedItems);
     // Preserving the existing tax calculation behavior.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -122,12 +132,13 @@ const CreateBill = () => {
       newSubtotal += item.amount;
     });
 
-    const calculatedTax = (newSubtotal * taxRate) / 100;
+    const taxableAmount = Math.max(0, newSubtotal - discount);
+    const calculatedTax = (taxableAmount * taxRate) / 100;
 
     setSubtotal(newSubtotal);
     setTaxAmount(calculatedTax);
-    setTotal(newSubtotal + calculatedTax);
-  }, [items, taxRate]);
+    setTotal(taxableAmount + calculatedTax);
+  }, [items, taxRate, discount]);
 
   // Handle item input changes
 
@@ -203,12 +214,26 @@ const CreateBill = () => {
 
   // Submit invoice
   const handleSubmit = async () => {
+    setSubmitError("");
+    
     const filteredItems = items.filter(
-      (item) => item.id && item.amount > 0,
+      (item) => item.id && item.amount > 0 && item.boxQty > 0,
     );
 
     if (!client || !issueDate) {
-      alert("Please select client and issue date");
+      toast.error("Please select a customer and invoice date.");
+      return;
+    }
+    if (!filteredItems.length) {
+      toast.error(
+        "Add at least one product with a box quantity before saving.",
+      );
+      return;   
+    }
+    if (!invoiceNumber) {
+      toast.error(
+        "The next invoice number could not be loaded. Refresh and try again.",
+      );
       return;
     }
 
@@ -221,16 +246,19 @@ const CreateBill = () => {
         issueDate,
         items: filteredItems,
         subtotal,
+        discount,
         tax: taxAmount,
         total,
         taxRate,
       });
 
-      console.log(res.data);
-      alert("Invoice created successfully!");
+      toast("Invoice Created Successfully !! ");
+      router.push(`/dashboard`);
     } catch (error) {
-      console.error("Error creating invoice:", error);
-      alert("Failed to create invoice. Check console for details.");
+      toast.error(
+        error.response?.data?.message ||
+          "Failed to save the invoice. Please try again.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -253,14 +281,6 @@ const CreateBill = () => {
       <header className="border-b border-slate-800 bg-slate-950/95">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div className="flex items-center gap-4">
-            <a
-              href="/dashboard/bill"
-              className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border border-slate-700 px-4 text-sm font-medium text-slate-300 transition hover:border-amber-400 hover:bg-slate-900 hover:text-amber-300"
-            >
-              <span aria-hidden="true">←</span>
-              Back to Bills
-            </a>
-
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-400">
                 Gurukrupa Agency
@@ -282,6 +302,16 @@ const CreateBill = () => {
           </div>
         </div>
       </header>
+
+      {initialDataLoading && (
+        <div
+          className="mx-auto flex w-fit items-center gap-2 px-4 py-3 text-sm text-slate-300"
+          role="status"
+        >
+          <LoadingAnimation size={36} label="Loading invoice data" />
+          Loading customers, products, and invoice number…
+        </div>
+      )}
 
       {/* Main content */}
       <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
@@ -342,13 +372,18 @@ const CreateBill = () => {
               </label>
               <select
                 className={inputClass}
-                value={clientaddress}
-                onChange={(e) => setClientAddress(e.target.value)}
+                value={selectedAddress}
+                onChange={(event) => {
+                  setSelectedAddress(event.target.value);
+                  setClient(null);
+                }}
+                required
+                aria-label="Filter clients by address"
               >
-                <option value="">Select a client address</option>
-                {address.map((addr, idx) => (
-                  <option key={idx} value={addr}>
-                    {addr}
+                <option value="">Select an address first</option>
+                {clientAddresses.map((address) => (
+                  <option key={address} value={address}>
+                    {address}
                   </option>
                 ))}
               </select>
@@ -360,12 +395,16 @@ const CreateBill = () => {
               </label>
               <select
                 className={inputClass}
-                value={clientname}
-                onChange={(e) => setClientName(e.target.value)}
+                value={client || ""}
+                disabled={!selectedAddress}
+                required
+                onChange={(event) => setClient(event.target.value || null)}
               >
-                <option value="">Select a client</option>
-                {filteredClients.map((c, idx) => (
-                  <option key={idx} value={c.clientname}>
+                <option value="">
+                  {selectedAddress ? "Select a client" : "Select address first"}
+                </option>
+                {clientsAtSelectedAddress.map((c) => (
+                  <option key={c._id} value={c._id}>
                     {c.clientname}
                   </option>
                 ))}
@@ -385,6 +424,19 @@ const CreateBill = () => {
             </div>
           </div>
         </section>
+        {Number(selectedClient?.creditBalance || 0) > 0 && (
+          <p
+            role="status"
+            className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+          >
+            Available customer credit:{" "}
+            {formatCurrency(selectedClient.creditBalance)}. Up to{" "}
+            {formatCurrency(
+              Math.min(Number(selectedClient.creditBalance), total),
+            )}{" "}
+            will apply automatically to this invoice.
+          </p>
+        )}
 
         {/* Invoice items */}
         <section className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-xl shadow-black/10">
@@ -453,7 +505,7 @@ const CreateBill = () => {
 
                       {itemOptions.map((opt) => (
                         <option key={opt._id} value={opt._id}>
-                          {`${opt.itemname} X ${opt.itemperbox}`}
+                          {opt.itemname}
                         </option>
                       ))}
                     </select>
@@ -570,9 +622,28 @@ const CreateBill = () => {
                 className={inputClass}
               />
               <p className="mt-3 text-xs leading-5 text-slate-500">
-                Tax is calculated using your existing subtotal and tax-rate
-                logic.
+                GST is calculated after discount.
               </p>
+              <label
+                className={`${labelClass} mt-5`}
+                htmlFor="invoice-discount"
+              >
+                Discount (₹)
+              </label>
+              <input
+                id="invoice-discount"
+                type="number"
+                min="0"
+                max={subtotal}
+                step="0.01"
+                value={discount}
+                onChange={(e) =>
+                  setDiscount(
+                    Math.min(subtotal, Math.max(0, Number(e.target.value))),
+                  )
+                }
+                className={inputClass}
+              />
             </div>
 
             {/* Amount summary */}
@@ -583,6 +654,13 @@ const CreateBill = () => {
                 </span>
                 <span className="font-medium text-white">
                   {formatCurrency(subtotal)}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-sm text-slate-400">Discount</span>
+                <span className="font-medium text-white">
+                  − {formatCurrency(discount)}
                 </span>
               </div>
 
@@ -612,6 +690,19 @@ const CreateBill = () => {
             </div>
           </div>
         </section>
+        {message && (
+          <div
+            role="status"
+            aria-live="polite"
+            className={`rounded-xl border px-4 py-3 text-sm ${
+              message.type === "success"
+                ? "border-emerald-800 bg-emerald-950/40 text-emerald-300"
+                : "border-red-800 bg-red-950/40 text-red-300"
+            }`}
+          >
+            {message.text}
+          </div>
+        )}
 
         {/* Actions */}
         <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-xl shadow-black/10 sm:p-7">
@@ -626,6 +717,14 @@ const CreateBill = () => {
             </div>
 
             <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+              {submitError && (
+                <p
+                  role="alert"
+                  className="mb-3 w-full rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700"
+                >
+                  {submitError}
+                </p>
+              )}
               <button
                 type="button"
                 onClick={() => (window.location.href = "/dashboard")}
@@ -644,11 +743,7 @@ const CreateBill = () => {
                     : "bg-amber-400 text-slate-950 hover:bg-amber-300 active:scale-[0.98]"
                 }`}
               >
-                {isLoading
-                  ? "Saving Invoice..."
-                  : isEditing
-                    ? "Update Invoice"
-                    : "Create Invoice"}
+                {isLoading ? <span className="inline-flex items-center gap-2"><LoadingAnimation size={28} label="Saving invoice" /> Saving Invoice...</span> : "Create Invoice"}
               </button>
             </div>
           </div>

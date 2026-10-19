@@ -6,6 +6,7 @@ import logo from "/public/Gurukrupa logo.png";
 import { useState } from "react";
 import axios from "axios";
 import { useRouter } from "next/navigation";
+import LoadingAnimation from "@/components/LoadingAnimation";
 
 export default function Home() {
   const [email, setEmail] = useState("");
@@ -149,7 +150,7 @@ export default function Home() {
                     autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
+                    placeholder="Enter user name"
                     required
                     className="w-full rounded-xl border border-slate-700 bg-slate-900 py-3.5 pl-12 pr-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20"
                   />
@@ -218,26 +219,7 @@ export default function Home() {
               >
                 {isLoading ? (
                   <>
-                    <svg
-                      className="h-5 w-5 animate-spin"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z"
-                      />
-                    </svg>
+                    <LoadingAnimation size={30} label="Signing in" />
                     Signing in...
                   </>
                 ) : (
@@ -250,7 +232,7 @@ export default function Home() {
             </form>
 
             {/* Signup link */}
-            <div className="mt-7 border-t border-slate-800 pt-6 text-center">
+            {/* <div className="mt-7 border-t border-slate-800 pt-6 text-center">
               <p className="text-sm text-slate-400">
                 Don&apos;t have an account?{" "}
                 <a
@@ -260,10 +242,10 @@ export default function Home() {
                   Create Account
                 </a>
               </p>
-            </div>
+            </div> */}
 
             <p className="mt-8 text-center text-xs text-slate-600">
-              © {new Date().getFullYear()} Gurukrupa Agency
+              © {new Date().getFullYear()} Gurukrupa Agency Business Dashboard - Developed By  SUJAL GATADE
             </p>
           </div>
         </section>

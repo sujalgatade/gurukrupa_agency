@@ -1,9 +1,11 @@
 "use client";
 
 import InvoicePrint from "@/components/InvoicePrint";
+import Link from "next/link";
 import printDocument from "@/lib/printDocument";
 import axios from "axios";
 import { useState, useEffect, useMemo } from "react";
+import LoadingAnimation from "@/components/LoadingAnimation";
 
 const MONTHS = [
   "January",
@@ -194,31 +196,10 @@ const Billinghistory = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-slate-950 text-white">
+    <main className="min-h-screen w-full bg-slate-950 text-white">
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {/* Header */}
         <header className="mb-8">
-          <a
-            href="/dashboard"
-            className="mb-6 inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:border-amber-400/50 hover:bg-slate-800 hover:text-amber-300"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="h-4 w-4"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="m15 18-6-6 6-6"
-              />
-            </svg>
-            Back to Dashboard
-          </a>
-
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="mb-2 flex items-center gap-2">
@@ -250,6 +231,11 @@ const Billinghistory = () => {
             </div>
           </div>
         </header>
+
+        <nav className="billing-tabs" aria-label="Billing and sales views">
+          <Link href="/dashboard/bill">Invoices</Link>
+          <Link href="/dashboard/billinghistory" aria-current="page">Sales history</Link>
+        </nav>
 
         {/* Summary Cards */}
         <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -520,7 +506,9 @@ const Billinghistory = () => {
 
           {loading ? (
             <div className="rounded-2xl border border-slate-800 bg-slate-900 px-5 py-16 text-center">
-              <div className="mx-auto mb-4 h-9 w-9 animate-spin rounded-full border-2 border-slate-700 border-t-amber-400" />
+              <div className="mb-4 flex justify-center">
+                <LoadingAnimation size={72} label="Loading billing history" />
+              </div>
               <p className="font-medium text-slate-200">
                 Loading billing history...
               </p>
@@ -729,7 +717,7 @@ const Billinghistory = () => {
           Gurukrupa Agency · Billing History
         </footer>
       </div>
-    </div>
+    </main>
   );
 };
 

@@ -1,221 +1,698 @@
-"use client"
-const Home = () => {
-  const menu = [
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import LoadingAnimation from "@/components/LoadingAnimation";
+import {
+  ArrowDownLeft,
+  ArrowRight,
+  ArrowUpRight,
+  BarChart3,
+  Boxes,
+  ChevronDown,
+  CircleHelp,
+  Download,
+  FilePlus2,
+  FileText,
+  LayoutDashboard,
+  Menu,
+  Package,
+  Search,
+  Settings2,
+  ShoppingCart,
+  Users,
+  Wallet,
+  X,
+} from "lucide-react";
+import ThemeToggle from "@/components/ThemeToggle";
+import AiAssistantLauncher from "@/components/AiAssistantLauncher";
+
+const menu = [
+  { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Billing & Sales", href: "/dashboard/bill", icon: FileText },
+  { label: "Customers", href: "/dashboard/client", icon: Users },
+  { label: "Inventory", href: "/dashboard/stock", icon: Boxes },
+  { label: "Purchases", href: "/dashboard/buy", icon: ShoppingCart },
+  { label: "Payments", href: "/dashboard/payment", icon: Wallet },
+  { label: "Orders", href: "/dashboard/orders", icon: Package },
+  { label: "Profit & Loss", href: "/dashboard/profitloss", icon: BarChart3 },
+  { label: "Export & Backup", href: "/dashboard/export", icon: Download },
+];
+const currency = (n) =>
+  `₹${Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+const asArray = (value) =>
+  Array.isArray(value) ? value : Array.isArray(value?.data) ? value.data : [];
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good Morning";
+  if (hour < 17) return "Good Afternoon";
+  if(hour<22) return "Good Evening";
+  return "Good Night"
+};
+
+export default function Dashboard() {
+  const [data, setData] = useState({
+    bills: [],
+    items: [],
+    clients: [],
+    purchases: [],
+  });
+  const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState(false);
+  const [query, setQuery] = useState("");
+  const [mobileNav, setMobileNav] = useState(false);
+  const [greeting, setGreeting] = useState("Good morning");
+
+  useEffect(() => {
+    const updateGreeting = () => setGreeting(getGreeting());
+    updateGreeting();
+    const interval = window.setInterval(updateGreeting, 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    Promise.allSettled([
+      fetch("/api/bill", { cache: "no-store" }).then((r) =>
+        r.ok ? r.json() : Promise.reject(),
+      ),
+      fetch("/api/items?unique=true&bill=true", { cache: "no-store" }).then(
+        (r) => (r.ok ? r.json() : Promise.reject()),
+      ),
+      fetch("/api/client", { cache: "no-store" }).then((r) =>
+        r.ok ? r.json() : Promise.reject(),
+      ),
+      fetch("/api/buy-bill", { cache: "no-store" }).then((r) =>
+        r.ok ? r.json() : Promise.reject(),
+      ),
+    ]).then((results) => {
+      if (!active) return;
+      setData({
+        bills:
+          results[0].status === "fulfilled" ? asArray(results[0].value) : [],
+        items:
+          results[1].status === "fulfilled" ? asArray(results[1].value) : [],
+        clients:
+          results[2].status === "fulfilled" ? asArray(results[2].value) : [],
+        purchases:
+          results[3].status === "fulfilled" ? asArray(results[3].value) : [],
+      });
+      setApiError(results.some((result) => result.status === "rejected"));
+      setLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const dateKey = (value) => {
+    const date = new Date(value);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  };
+  const todayKey = dateKey(new Date());
+  const todayBills = data.bills.filter(
+    (bill) => dateKey(bill.issueDate) === todayKey,
+  );
+  const todayReturns = data.bills
+    .flatMap((bill) => bill.returns || [])
+    .filter((entry) => dateKey(entry.date) === todayKey);
+  const todaySales =
+    todayBills.reduce((sum, bill) => sum + Number(bill.total || 0), 0) -
+    todayReturns.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+  const openingDue = data.clients.reduce(
+    (sum, client) =>
+      sum +
+      Math.max(
+        0,
+        Number(client.openingBalance || 0) -
+          Number(client.openingBalancePaid || 0),
+      ),
+    0,
+  );
+  const outstanding =
+    openingDue +
+    data.bills.reduce(
+      (sum, bill) =>
+        sum +
+        (bill.isPaid
+          ? 0
+          : Math.max(
+              0,
+              Number(bill.total || 0) -
+                Number(bill.paidAmount || 0) -
+                Number(bill.returnedAmount || 0) -
+                Number(bill.creditApplied || 0),
+            )),
+      0,
+    );
+  const supplierPayable = data.purchases.reduce(
+    (sum, purchase) =>
+      sum +
+      Math.max(
+        0,
+        Number(purchase.total || 0) -
+          Number(purchase.paidAmount || 0) -
+          Number(purchase.returnedAmount || 0) -
+          Number(purchase.supplierCreditApplied || 0),
+      ),
+    0,
+  );
+  const todayReceipts =
+    data.bills.reduce(
+      (sum, bill) =>
+        sum +
+        (bill.paymentEntries || [])
+          .filter((entry) => dateKey(entry.receivedAt) === todayKey)
+          .reduce((amount, entry) => amount + Number(entry.amount || 0), 0),
+      0,
+    ) +
+    data.clients.reduce(
+      (sum, client) =>
+        sum +
+        (client.openingBalanceEntries || [])
+          .filter((entry) => dateKey(entry.receivedAt) === todayKey)
+          .reduce((amount, entry) => amount + Number(entry.amount || 0), 0),
+      0,
+    );
+  const todayGrossProfit =
+    todayBills.reduce((sum, bill) => sum + Number(bill.profit || 0), 0) -
+    todayReturns.reduce(
+      (sum, entry) => sum + Number(entry.profitReduction || 0),
+      0,
+    );
+  const stockUnits = data.items.reduce(
+    (sum, item) => sum + Number(item.box || 0) * Number(item.itemperbox || 0),
+    0,
+  );
+  const stockValue = data.items.reduce(
+    (sum, item) =>
+      sum +
+      Number(item.box || 0) *
+        Number(item.itemperbox || 0) *
+        Number(item.originalrate || 0),
+    0,
+  );
+  const outOfStock = data.items.filter((item) => Number(item.box || 0) <= 0);
+  const lowStock = data.items.filter(
+    (item) => Number(item.box || 0) > 0 && Number(item.box || 0) <= 2,
+  );
+  const recentBills = [...data.bills]
+    .sort(
+      (a, b) =>
+        new Date(b.issueDate || b.createdAt) -
+        new Date(a.issueDate || a.createdAt),
+    )
+    .slice(0, 5);
+  const topProduct = data.bills
+    .flatMap((bill) => bill.items || [])
+    .reduce((totals, line) => {
+      const name = line.itemname || "Unnamed product";
+      totals[name] =
+        (totals[name] || 0) +
+        Number(line.quantity || 0) *
+          Math.max(
+            0,
+            Number(line.boxQty || 0) - Number(line.returnedBoxes || 0),
+          );
+      return totals;
+    }, {});
+  const bestSeller = Object.entries(topProduct).sort((a, b) => b[1] - a[1])[0];
+  const searchResults = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return [];
+    return [
+      ...data.bills
+        .filter(
+          (bill) =>
+            String(bill.invoiceNumber).includes(term) ||
+            String(bill.client?.clientname || "")
+              .toLowerCase()
+              .includes(term),
+        )
+        .map((bill) => ({
+          title: `Bill #${bill.invoiceNumber}`,
+          detail: bill.client?.clientname || "Customer not linked",
+          href: "/dashboard/bill",
+        })),
+      ...data.clients
+        .filter(
+          (client) =>
+            String(client.clientname || "")
+              .toLowerCase()
+              .includes(term) || String(client.phone || "").includes(term),
+        )
+        .map((client) => ({
+          title: client.clientname,
+          detail: client.phone || "Customer",
+          href: "/dashboard/client",
+        })),
+      ...data.items
+        .filter((item) =>
+          String(item.itemname || "")
+            .toLowerCase()
+            .includes(term),
+        )
+        .map((item) => ({
+          title: item.itemname,
+          detail:
+            Number(item.box || 0) <= 0
+              ? "Out of stock"
+              : `${item.box} boxes in stock`,
+          href: "/dashboard/stock",
+        })),
+    ].slice(0, 6);
+  }, [data, query]);
+
+  const stats = [
     {
-      name: "Bill",
-      icon: "M304 112L192 112C183.2 112 176 119.2 176 128L176 512C176 520.8 183.2 528 192 528L448 528C456.8 528 464 520.8 464 512L464 272L376 272C336.2 272 304 239.8 304 200L304 112zM444.1 224L352 131.9L352 200C352 213.3 362.7 224 376 224L444.1 224zM128 128C128 92.7 156.7 64 192 64L325.5 64C342.5 64 358.8 70.7 370.8 82.7L493.3 205.3C505.3 217.3 512 233.6 512 250.6L512 512C512 547.3 483.3 576 448 576L192 576C156.7 576 128 547.3 128 512L128 128z",
-      href: "/dashboard/bill",
+      label: "Today's sales",
+      value: currency(todaySales),
+      note: `${todayBills.length} invoices today`,
+      icon: ArrowUpRight,
+      tone: "blue",
     },
     {
-      name: "Orders",
-      icon: "M96 144C87.2 144 80 151.2 80 160L80 448C80 456.8 87.2 464 96 464L99.3 464C109.7 427.1 143.7 400 184 400C224.3 400 258.2 427.1 268.7 464L371.3 464C376.2 446.6 386.4 431.3 400 420.1L400 160C400 151.2 392.8 144 384 144L96 144zM99.3 512L96 512C60.7 512 32 483.3 32 448L32 160C32 124.7 60.7 96 96 96L384 96C419.3 96 448 124.7 448 160L448 192L503.4 192C520.4 192 536.7 198.7 548.7 210.7L589.3 251.3C601.3 263.3 608 279.6 608 296.6L608 448C608 483.3 579.3 512 544 512L540.7 512C530.3 548.9 496.3 576 456 576C415.7 576 381.8 548.9 371.3 512L268.7 512C258.3 548.9 224.3 576 184 576C143.7 576 109.8 548.9 99.3 512zM448 320L560 320L560 296.6C560 292.4 558.3 288.3 555.3 285.3L514.7 244.7C511.7 240 507.6 240 503.4 240L448 240L448 320zM448 368L448 400.4C450.6 400.2 453.3 400 456 400C496.3 400 530.2 427.1 540.7 464L544 464C552.8 464 560 456.8 560 448L560 368L448 368zM184 528C206.1 528 224 510.1 224 488C224 465.9 206.1 448 184 448C161.9 448 144 465.9 144 488C144 510.1 161.9 528 184 528zM456 528C478.1 528 496 510.1 496 488C496 465.9 478.1 448 456 448C433.9 448 416 465.9 416 488C416 510.1 433.9 528 456 528z",
-      href: "/dashboard/orders",
+      label: "Payments received today",
+      value: currency(todayReceipts),
+      note: "Recorded customer receipts",
+      icon: ArrowDownLeft,
+      tone: "green",
     },
     {
-      name: "Billing History",
-      icon: "M528 320C528 434.9 434.9 528 320 528C205.1 528 112 434.9 112 320C112 205.1 205.1 112 320 112C434.9 112 528 205.1 528 320zM64 320C64 461.4 178.6 576 320 576C461.4 576 576 461.4 576 320C576 178.6 461.4 64 320 64C178.6 64 64 178.6 64 320zM296 184L296 320C296 328 300 335.5 306.7 340L402.7 404C413.7 411.4 428.6 408.4 436 397.3C443.4 386.2 440.4 371.4 429.3 364L344 307.2L344 184C344 170.7 333.3 160 320 160C306.7 160 296 170.7 296 184z",
-      href: "/dashboard/billinghistory",
+      label: "Customer receivables",
+      value: currency(outstanding),
+      note: "Total invoice balance",
+      icon: Wallet,
+      tone: "amber",
     },
     {
-      name: "Payment",
-      icon: "M308 96c6.627 0 12-5.373 12-12V44c0-6.627-5.373-12-12-12H12C5.373 32 0 37.373 0 44v44.748c0 6.627 5.373 12 12 12h85.28c27.308 0 48.261 9.958 60.97 27.252H12c-6.627 0-12 5.373-12 12v40c0 6.627 5.373 12 12 12h158.757c-6.217 36.086-32.961 58.632-74.757 58.632H12c-6.627 0-12 5.373-12 12v53.012c0 3.349 1.4 6.546 3.861 8.818l165.052 152.356a12.001 12.001 0 0 0 8.139 3.182h82.562c10.924 0 16.166-13.408 8.139-20.818L116.871 319.906c76.499-2.34 131.144-53.395 138.318-127.906H308c6.627 0 12-5.373 12-12v-40c0-6.627-5.373-12-12-12h-58.69c-3.486-11.541-8.28-22.246-14.252-32H308z",
-      href: "/dashboard/payment",
+      label: "Stock value",
+      value: currency(stockValue),
+      note: `${stockUnits.toLocaleString("en-IN")} pieces on hand`,
+      icon: Boxes,
+      tone: "violet",
     },
     {
-      name: "Stock",
-      icon: "M160 144C151.2 144 144 151.2 144 160L144 480C144 488.8 151.2 496 160 496L480 496C488.8 496 496 488.8 496 480L496 160C496 151.2 488.8 144 480 144L160 144zM96 160C96 124.7 124.7 96 160 96L480 96C515.3 96 544 124.7 544 160L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 160zM320 192C333.3 192 344 202.7 344 216L344 424C344 437.3 333.3 448 320 448C306.7 448 296 437.3 296 424L296 216C296 202.7 306.7 192 320 192zM224 288C237.3 288 248 298.7 248 312L248 424C248 437.3 237.3 448 224 448C210.7 448 200 437.3 200 424L200 312C200 298.7 210.7 288 224 288zM392 376C392 362.7 402.7 352 416 352C429.3 352 440 362.7 440 376L440 424C440 437.3 429.3 448 416 448C402.7 448 392 437.3 392 424L392 376z",
-      href: "/dashboard/stock",
+      label: "Supplier payables",
+      value: currency(supplierPayable),
+      note: "Unpaid purchase balances",
+      icon: ShoppingCart,
+      tone: "amber",
     },
-    {
-      name: "Clients",
-      icon: "M320 256C355.3 256 384 227.3 384 192C384 156.7 355.3 128 320 128C284.7 128 256 156.7 256 192C256 227.3 284.7 256 320 256zM320 80C381.9 80 432 130.1 432 192C432 253.9 381.9 304 320 304C258.1 304 208 253.9 208 192C208 130.1 258.1 80 320 80zM296 400C238.6 400 192 446.6 192 504L192 520C192 533.3 181.3 544 168 544C154.7 544 144 533.3 144 520L144 504C144 420.1 212.1 352 296 352L344 352C427.9 352 496 420.1 496 504L496 520C496 533.3 485.3 544 472 544C458.7 544 448 533.3 448 520L448 504C448 446.6 401.4 400 344 400L296 400zM431.4 306.8C443.1 295.5 453 282.4 460.8 268C466.7 270.6 473.2 272 480 272C506.5 272 528 250.5 528 224C528 197.5 506.5 176 480 176L479.2 176C477.6 159.4 473.4 143.6 467.1 128.9C471.3 128.3 475.7 128 480 128C533 128 576 171 576 224C576 277 533 320 480 320C462.3 320 445.7 315.2 431.4 306.8zM160 128C164.4 128 168.7 128.3 172.9 128.9C170.6 144.4 160 160 160 176L160 176C133.5 176 112 197.5 112 224C112 250.5 133.5 272 160 272C166.8 272 173.3 270.6 179.2 268C187 282.4 196.9 295.5 208.6 306.8C194.4 315.2 177.8 320 160 320C107 320 64 277 64 224C64 171 107 128 160 128zM149.3 368C134.2 384.3 121.8 403 112.8 423.6C74.8 439.1 48 476.4 48 520C48 533.3 37.3 544 24 544C10.7 544 0 533.3 0 520C0 436.9 66.6 369.4 149.3 368zM527.2 423.6C518.2 403 505.7 384.2 490.7 368C573.4 369.4 640 436.9 616 520C602.7 533.3 592 544 592 520C592 476.4 565.2 439.1 527.2 423.6z",
-      href: "/dashboard/client",
-    },
-    {
-      name: "Buying Bill",
-      icon: "M480 576L192 576C139 576 96 533 96 480L96 160C96 107 139 64 192 64L496 64C522.5 64 544 85.5 544 112L544 400C544 420.9 530.6 438.7 512 445.3L512 512C529.7 512 544 526.3 544 544C544 561.7 529.7 576 512 576L480 576zM192 448C174.3 448 160 462.3 160 480C160 497.7 174.3 512 192 512L448 512L448 448L192 448zM224 216C224 229.3 234.7 240 248 240L424 240C437.3 240 448 229.3 448 216C448 202.7 437.3 192 424 192L248 192C234.7 192 224 202.7 224 216zM248 288C234.7 288 224 298.7 224 312C224 325.3 234.7 336 248 336L424 336C437.3 336 448 325.3 448 312C448 298.7 437.3 288 424 288L248 288z",
-      href: "/dashboard/buy",
-    },
-    {
-      name: "Profit And Loss Dashboard",
-      icon: "M480 576L192 576C139 576 96 533 96 480L96 160C96 107 139 64 192 64L496 64C522.5 64 544 85.5 544 112L544 400C544 420.9 530.6 438.7 512 445.3L512 512C529.7 512 544 526.3 544 544C544 561.7 529.7 576 512 576L480 576zM192 448C174.3 448 160 462.3 160 480C160 497.7 174.3 512 192 512L448 512L448 448L192 448zM224 216C224 229.3 234.7 240 248 240L424 240C437.3 240 448 229.3 448 216C448 202.7 437.3 192 424 192L248 192C234.7 192 224 202.7 224 216zM248 288C234.7 288 224 298.7 224 312C224 325.3 234.7 336 248 336L424 336C437.3 336 448 325.3 448 312C448 298.7 437.3 288 424 288L248 288z",
-      href: "",
-    },
+    // {
+    //   label: "Today's gross profit",
+    //   value: currency(todayGrossProfit),
+    //   note: "Recorded invoice margin before expenses",
+    //   icon: ArrowUpRight,
+    //   tone: "blue",
+    // },
   ];
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-slate-950 text-white">
-      {/* Background decoration */}
-      <div
-        className="pointer-events-none fixed inset-0 overflow-hidden"
-        aria-hidden="true"
-      >
-        <div className="absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-amber-400/10 blur-3xl" />
-        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-blue-500/10 blur-3xl" />
-      </div>
-
-      <div className="relative mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10">
-        {/* Header */}
-        <header className="mb-8 flex flex-col gap-5 border-b border-white/10 pb-7 sm:mb-10 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-300/30 bg-amber-400/10 text-amber-300 sm:h-14 sm:w-14">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                className="h-7 w-7 sm:h-8 sm:w-8"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M4 20V9l8-5 8 5v11M2 20h20M8 20v-6h8v6M8 10h.01M16 10h.01"
-                />
-              </svg>
-            </div>
-
-            <div>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-amber-300">
-                Business Management
-              </p>
-              <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                Gurukrupa Agency
-              </h1>
-            </div>
+    <div className="app-shell">
+      {!mobileNav && <AiAssistantLauncher />}
+      {mobileNav && (
+        <button
+          className="mobile-scrim"
+          aria-label="Close menu"
+          onClick={() => setMobileNav(false)}
+        />
+      )}
+      <aside className={`sidebar ${mobileNav ? "sidebar-open" : ""}`}>
+        <div className="brand-row">
+          <Link href="/dashboard" className="brand-logo-card" aria-label="Gurukrupa Agency overview" onClick={() => setMobileNav(false)}>
+            <Image
+              src="/Gurukrupa%20logo.png"
+              alt="Gurukrupa Agency"
+              width={797}
+              height={222}
+              className="brand-logo"
+              priority
+            />
+          </Link>
+          <button
+            className="mobile-close"
+            onClick={(e) => {
+              setMobileNav(false);
+            }}
+            aria-label="Close navigation"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className="workspace-label">WORKSPACE</div>
+        <nav className="side-nav" aria-label="Main navigation">
+          {menu.map(({ label, href, icon: Icon }) => (
+            <Link
+              key={label}
+              href={href}
+              onClick={() => setMobileNav(false)}
+              className={`nav-link ${label === "Overview" ? "nav-active" : ""}`}
+            >
+              <Icon size={18} strokeWidth={1.8} />
+              <span>{label}</span>
+              {label === "Inventory" &&
+                lowStock.length + outOfStock.length > 0 && (
+                  <b className="nav-count">
+                    {lowStock.length + outOfStock.length}
+                  </b>
+                )}
+            </Link>
+          ))}
+        </nav>
+        <div className="sidebar-spacer" />
+        {/* <div className="help-card">
+          <div className="help-icon">
+            <CircleHelp size={17} />
           </div>
+          <strong>Need a hand?</strong>
+          <p>Your business overview, all in one place.</p>
+          <Link href="/dashboard">
+            Explore dashboard <ArrowRight size={14} />
+          </Link>
+        </div> */}
+        {/* <div className="user-card">
+          <div className="user-avatar">GA</div>
+          <div className="user-name">
+            <strong>Gurukrupa Agency</strong>
+            <small>Business account</small>
+          </div>
+          <ChevronDown size={15} className="muted-icon" />
+        </div> */}
+      </aside>
 
-          <div className="flex items-center gap-2 self-start rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 sm:self-auto">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            <span className="text-xs font-medium text-emerald-300 sm:text-sm">
-              Business Dashboard
-            </span>
+      <main className="main-area">
+        <header className="topbar">
+          <button
+            className="menu-toggle"
+            onClick={() => setMobileNav(true)}
+            aria-label="Open navigation"
+          >
+            <Menu size={21} />
+          </button>
+          <div className="breadcrumb">
+            Workspace <span>/</span> <strong>Dashboard</strong>
+          </div>
+          <div className="topbar-right">
+            <label className="search-box">
+              <Search size={17} />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search bills, customers, products..."
+                aria-label="Search bills, customers, products"
+              />
+            </label>
+            <ThemeToggle />
+            {/* <button className="icon-button" aria-label="Settings">
+              <Settings2 size={18} />
+            </button> */}
           </div>
         </header>
-
-        {/* Welcome section */}
-        <section className="mb-8 sm:mb-10">
-          <p className="mb-2 text-sm font-medium text-amber-300">
-            YOUR WORKSPACE
-          </p>
-
-          <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl lg:text-4xl">
-            Welcome back!
-          </h2>
-
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
-            Manage your billing, orders, inventory, customers, and payments
-            from one convenient place.
-          </p>
-        </section>
-
-        {/* Module heading */}
-        <div className="mb-5 flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-lg font-semibold text-white sm:text-xl">
-              Business Modules
-            </h3>
-            <p className="mt-1 text-sm text-slate-400">
-              Select a module to get started
-            </p>
-          </div>
-
-          <span className="shrink-0 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300">
-            {menu.length} modules
-          </span>
+        <div className="page-content">
+          <section className="welcome-row">
+            <div>
+              <div className="eyebrow">
+                <span className="live-dot" /> BUSINESS DASHBOARD
+              </div>
+              <h1>
+                {greeting}, Gurukrupa Agency<span>👋</span>
+              </h1>
+              <p>Here’s what’s happening with your business today.</p>
+            </div>
+            <Link className="primary-button" href="/dashboard/createbill">
+              <FilePlus2 size={40} /> Create New Invoice
+            </Link>
+          </section>
+          {query.trim() && (
+            <section className="search-results">
+              <div className="search-results-head">
+                <strong>Search results</strong>
+                <button onClick={() => setQuery("")}>Clear</button>
+              </div>
+              {searchResults.length ? (
+                searchResults.map((result, index) => (
+                  <Link key={`${result.title}-${index}`} href={result.href}>
+                    <Search size={15} />
+                    <span>
+                      <strong>{result.title}</strong>
+                      <small>{result.detail}</small>
+                    </span>
+                    <ArrowRight size={15} />
+                  </Link>
+                ))
+              ) : (
+                <p>No matching bills, customers, or products.</p>
+              )}
+            </section>
+          )}
+          {apiError && (
+            <div className="data-notice">
+              Some business records could not be loaded. Summary figures may be
+              incomplete.
+            </div>
+          )}
+          <section className="stats-grid" aria-label="Business summary">
+            {stats.map(({ label, value, note, icon: Icon, tone }) => (
+              <article className="stat-card" key={label}>
+                <div className="stat-top">
+                  <span>{label}</span>
+                  <span className={`stat-icon ${tone}`}>
+                    <Icon size={18} />
+                  </span>
+                </div>
+                <strong className="stat-value">{loading ? "—" : value}</strong>
+                <div className="stat-note">
+                  <span className={`note-dot ${tone}`} />
+                  {loading ? <span className="inline-flex items-center gap-1"><LoadingAnimation size={28} label="Loading business records" />Loading records</span> : note}
+                </div>
+              </article>
+            ))}
+          </section>
+          <section className="content-grid">
+            <article className="panel recent-panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>Recent invoices</h2>
+                  <p>Your latest customer billing activity</p>
+                </div>
+                <Link href="/dashboard/bill" className="text-link">
+                  View all <ArrowRight size={15} />
+                </Link>
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>INVOICE</th>
+                      <th>CUSTOMER</th>
+                      <th>DATE</th>
+                      <th>AMOUNT</th>
+                      <th>STATUS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loading ? (
+                      <tr>
+                        <td colSpan="5" className="empty-state">
+                          <span className="inline-flex items-center gap-2"><LoadingAnimation size={32} label="Loading invoices" />Loading invoices…</span>
+                        </td>
+                      </tr>
+                    ) : recentBills.length ? (
+                      recentBills.map((bill) => (
+                        <tr key={bill._id}>
+                          <td>
+                            <span className="invoice-id">
+                              #{bill.invoiceNumber}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="customer-cell">
+                              <span className="customer-avatar">
+                                {(bill.client?.clientname || "C")
+                                  .slice(0, 1)
+                                  .toUpperCase()}
+                              </span>
+                              {bill.client?.clientname || "Walk-in customer"}
+                            </span>
+                          </td>
+                          <td>
+                            {bill.issueDate
+                              ? new Date(bill.issueDate).toLocaleDateString(
+                                  "en-IN",
+                                  {
+                                    day: "2-digit",
+                                    month: "short",
+                                    year: "numeric",
+                                  },
+                                )
+                              : "—"}
+                          </td>
+                          <td className="amount-cell">
+                            {currency(bill.total)}
+                          </td>
+                          <td>
+                            <span
+                              className={`status-pill ${bill.isPaid ? "paid" : "due"}`}
+                            >
+                              <i />
+                              {bill.isPaid ? "Paid" : "Due"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="5" className="empty-state">
+                          No invoices yet. Create your first invoice to see
+                          activity here.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </article>
+            <article className="panel stock-panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>Stock watch</h2>
+                  <p>Products that need attention</p>
+                </div>
+                <Link
+                  href="/dashboard/stock"
+                  className="round-link"
+                  aria-label="View inventory"
+                >
+                  <ArrowRight size={16} />
+                </Link>
+              </div>
+              <div className="stock-summary">
+                <span className="stock-summary-icon">
+                  <Boxes size={18} />
+                </span>
+                <span>
+                  <strong>{loading ? "—" : lowStock.length}</strong>
+                  <small>Low stock items</small>
+                </span>
+                <span className="stock-caption">1–2 boxes remaining</span>
+              </div>
+              {!loading && outOfStock.length > 0 && (
+                <div className="out-of-stock-alert" role="status">
+                  <span className="out-of-stock-mark" aria-hidden="true">
+                    !
+                  </span>
+                  <div>
+                    <strong>
+                      Out of stock · {outOfStock.length}{" "}
+                      {outOfStock.length === 1 ? "product" : "products"}
+                    </strong>
+                    <p>
+                      {outOfStock
+                        .slice(0, 3)
+                        .map((item) => item.itemname)
+                        .join(", ")}
+                      {outOfStock.length > 3
+                        ? ` and ${outOfStock.length - 3} more`
+                        : ""}
+                    </p>
+                  </div>
+                </div>
+              )}
+              <div className="stock-list">
+                {loading ? (
+                  <div className="stock-empty"><LoadingAnimation size={48} label="Loading inventory" />Loading inventory…</div>
+                ) : lowStock.length ? (
+                  lowStock.slice(0, 4).map((item) => (
+                    <div className="stock-item" key={item._id}>
+                      <span className="product-icon">
+                        <Package size={16} />
+                      </span>
+                      <span className="product-name">
+                        <strong>{item.itemname}</strong>
+                        <small>{item.itemperbox || 0} pcs / box</small>
+                      </span>
+                      <span className="stock-qty">
+                        {item.box || 0}
+                        <small>boxes</small>
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="stock-empty">
+                    No products are running low.
+                  </div>
+                )}
+              </div>
+              {bestSeller && (
+                <div className="stock-summary best-seller">
+                  <span className="product-icon">
+                    <Package size={16} />
+                  </span>
+                  <span className="product-name">
+                    <small>Best seller · all recorded sales</small>
+                    <strong>{bestSeller[0]}</strong>
+                  </span>
+                  <span className="stock-qty">
+                    {bestSeller[1]}
+                    <small>pieces</small>
+                  </span>
+                </div>
+              )}
+              <Link href="/dashboard/stock" className="stock-footer">
+                Manage Stock <ArrowRight size={15} />
+              </Link>
+            </article>
+          </section>
+          <section className="quick-section">
+            <div className="panel-heading">
+              <div>
+                <h2>Quick actions</h2>
+                <p>Get common tasks done faster</p>
+              </div>
+            </div>
+            <div className="quick-grid">
+              <Link href="/dashboard/createbill" className="quick-card">
+                <span className="quick-icon blue">
+                  <FilePlus2 size={19} />
+                </span>
+                <span>
+                  <strong>New invoice</strong>
+                  <small>Create a customer bill</small>
+                </span>
+                <ArrowRight size={16} />
+              </Link>
+              <Link href="/dashboard/client" className="quick-card">
+                <span className="quick-icon green">
+                  <Users size={19} />
+                </span>
+                <span>
+                  <strong>Add customer</strong>
+                  <small>Manage customer accounts</small>
+                </span>
+                <ArrowRight size={16} />
+              </Link>
+              <Link href="/dashboard/buy" className="quick-card">
+                <span className="quick-icon violet">
+                  <ShoppingCart size={19} />
+                </span>
+                <span>
+                  <strong>Record purchase</strong>
+                  <small>Add stock from supplier</small>
+                </span>
+                <ArrowRight size={16} />
+              </Link>
+            </div>
+          </section>
+          <footer className="dashboard-footer">
+            <span>
+              Gurukrupa Agency <span>·</span> Developed By SUJAL GATADE
+            </span>
+            <span>Data shown from recorded invoices and stock</span>
+          </footer>
         </div>
-
-        {/* Responsive module cards */}
-        <main className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
-          {menu.map((item) => {
-            const isAvailable = Boolean(item.href);
-
-            return (
-              <a
-                key={item.name}
-                href={item.href || undefined}
-                aria-disabled={!isAvailable}
-                onClick={(event) => {
-                  if (!isAvailable) {
-                    event.preventDefault();
-                  }
-                }}
-                className={`group relative flex min-h-36 items-center gap-4 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/80 p-5 shadow-lg shadow-black/10 transition-all duration-300 sm:min-h-40 sm:flex-col sm:items-start sm:justify-between sm:p-6 ${
-                  isAvailable
-                    ? "cursor-pointer hover:-translate-y-1 hover:border-amber-300/50 hover:bg-slate-900 hover:shadow-xl hover:shadow-amber-950/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
-                    : "cursor-not-allowed opacity-60"
-                }`}
-              >
-                {/* Hover accent */}
-                <div className="absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 bg-amber-300 transition-transform duration-300 group-hover:scale-x-100" />
-
-                {/* Icon */}
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-amber-300/20 bg-amber-300/10 text-amber-300 transition-colors duration-300 group-hover:bg-amber-300 group-hover:text-slate-950 sm:h-14 sm:w-14">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 640 640"
-                    className="h-6 w-6 sm:h-7 sm:w-7"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path d={item.icon} />
-                  </svg>
-                </div>
-
-                {/* Card text */}
-                <div className="min-w-0 flex-1 sm:w-full sm:flex-none">
-                  <h4 className="text-base font-semibold text-white transition-colors group-hover:text-amber-200 sm:text-lg">
-                    {item.name}
-                  </h4>
-
-                  <p className="mt-1 text-sm leading-5 text-slate-400">
-                    {item.name === "Bill" && "Create and manage bills"}
-                    {item.name === "Orders" && "Track customer orders"}
-                    {item.name === "Billing History" && "Review previous bills"}
-                    {item.name === "Payment" && "Manage business payments"}
-                    {item.name === "Stock" && "Monitor inventory levels"}
-                    {item.name === "Clients" && "Manage customer details"}
-                    {item.name === "Booking" && "Manage bookings and records"}
-                  </p>
-                </div>
-
-                {/* Arrow / availability */}
-                <div className="ml-auto shrink-0 text-slate-500 transition-all duration-300 group-hover:translate-x-1 group-hover:text-amber-300 sm:absolute sm:bottom-6 sm:right-6">
-                  {isAvailable ? (
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className="h-5 w-5"
-                      aria-hidden="true"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M5 12h14m-6-6 6 6-6 6"
-                      />
-                    </svg>
-                  ) : (
-                    <span className="text-xs">Coming soon</span>
-                  )}
-                </div>
-              </a>
-            );
-          })}
-        </main>
-
-        {/* Footer */}
-        <footer className="mt-10 border-t border-white/10 pt-5 text-center sm:mt-14">
-          <p className="text-xs text-slate-500 sm:text-sm">
-            © {new Date().getFullYear()} Gurukrupa Agency. All rights reserved.
-          </p>
-        </footer>
-      </div>
+      </main>
     </div>
   );
-};
-
-export default Home;
+}

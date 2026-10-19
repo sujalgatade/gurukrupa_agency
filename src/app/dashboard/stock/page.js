@@ -2,6 +2,7 @@
 
 import axios from "axios";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import LoadingAnimation from "@/components/LoadingAnimation";
 
 const MONTHS = [
   { value: 1, label: "January" },
@@ -181,12 +182,15 @@ const PurchaseHistory = () => {
   }, [selectedDay, daysInMonth]);
 
   // Filter by selected month/year, optional day, and search term.
-  // Sort newest first and display only the latest 10 matching records.
+  // Sort oldest first and display the first 10 matching records.
   const filteredPurchases = useMemo(() => {
     const term = search.trim().toLowerCase();
 
     return purchases
       .filter((purchase) => {
+        // Empty stock lots stay out of the inventory table.
+        if (Number(getBoxQuantity(purchase)) <= 0) return false;
+
         const dateKey = getDateKey(getPurchaseDate(purchase));
 
         if (!dateKey) return false;
@@ -221,12 +225,12 @@ const PurchaseHistory = () => {
         const dateA = new Date(getPurchaseDate(a) || 0).getTime();
         const dateB = new Date(getPurchaseDate(b) || 0).getTime();
 
-        if (dateB !== dateA) return dateB - dateA;
+        if (dateA !== dateB) return dateA - dateB;
 
         const createdA = new Date(a?.createdAt || 0).getTime();
         const createdB = new Date(b?.createdAt || 0).getTime();
 
-        return createdB - createdA;
+        return createdA - createdB;
       })
       .slice(0, 10);
   }, [purchases, month, year, selectedDay, search]);
@@ -249,27 +253,6 @@ const PurchaseHistory = () => {
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {/* Header */}
         <header className="mb-8">
-          <a
-            href="/dashboard"
-            className="mb-6 inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:border-amber-400/50 hover:bg-slate-800 hover:text-amber-300"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="h-4 w-4"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="m15 18-6-6 6-6"
-              />
-            </svg>
-            Back to Dashboard
-          </a>
-
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="mb-2 flex items-center gap-2">
@@ -280,7 +263,7 @@ const PurchaseHistory = () => {
               </div>
 
               <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                Purchase History
+                Stock History
               </h1>
 
               <p className="mt-2 text-sm text-slate-400">
@@ -301,7 +284,7 @@ const PurchaseHistory = () => {
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2"
-                className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+                className={`h-4 w-4 ${loading ? "hidden" : ""}`}
               >
                 <path
                   strokeLinecap="round"
@@ -314,6 +297,7 @@ const PurchaseHistory = () => {
                   d="M5.5 9A7 7 0 0 1 18 6l2 6M4 12l2 6a7 7 0 0 0 12.5-1"
                 />
               </svg>
+              {loading && <LoadingAnimation size={28} label="Loading purchases" />}
               {loading ? "Loading..." : "Refresh"}
             </button>
           </div>
@@ -321,7 +305,7 @@ const PurchaseHistory = () => {
 
         {/* Summary */}
         <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+          {/* <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
             <p className="text-sm text-slate-400">Matching Records Shown</p>
             <p className="mt-2 text-3xl font-bold text-amber-400">
               {loading ? "—" : filteredPurchases.length}
@@ -329,7 +313,7 @@ const PurchaseHistory = () => {
             <p className="mt-1 text-xs text-slate-500">
               Latest 10 matching purchase records maximum
             </p>
-          </div>
+          </div> */}
 
           <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
             <p className="text-sm text-slate-400">Selected Period</p>
@@ -496,9 +480,9 @@ const PurchaseHistory = () => {
         {/* Purchase Table */}
         <section className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
           <div className="border-b border-slate-800 p-4 sm:p-6">
-            <h2 className="text-xl font-bold">Purchase Records</h2>
+            <h2 className="text-xl font-bold">Available Stock</h2>
             <p className="mt-1 text-sm text-slate-400">
-              Sorted by newest purchase date first.
+              Sorted by oldest purchase date first.
             </p>
           </div>
 
@@ -527,7 +511,7 @@ const PurchaseHistory = () => {
                       colSpan={5}
                       className="px-5 py-16 text-center text-slate-400"
                     >
-                      <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-slate-700 border-t-amber-400" />
+                      <div className="mb-3 flex justify-center"><LoadingAnimation size={64} label="Loading purchase records" /></div>
                       Loading purchase records...
                     </td>
                   </tr>

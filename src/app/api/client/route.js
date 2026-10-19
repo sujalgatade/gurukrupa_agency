@@ -43,11 +43,20 @@ export const GET = async (req) => {
     }
 };
 export const POST = async (req) => {
-    const { clientname, address,gstNumber,phone } = await req.json();
-    console.log(clientname, address,gstNumber,phone);
     try {
+        const { clientname, address, gstNumber, phone, openingBalance, creditLimit } = await req.json();
+        if (!String(clientname || "").trim() || !String(address || "").trim()) {
+            return Response.json({ success: false, message: "Client name and address are required." }, { status: 400 });
+        }
+        const opening = Number(openingBalance || 0);
+        const limit = Number(creditLimit || 0);
+        if (!Number.isFinite(opening) || opening < 0 || !Number.isFinite(limit) || limit < 0) {
+            return Response.json({ success: false, message: "Opening balance and credit limit must be non-negative amounts." }, { status: 400 });
+        }
         await dbConnect();
-        const client = await Client.findOne({ clientname, address });
+        const cleanedName = String(clientname).trim();
+        const cleanedAddress = String(address).trim();
+        const client = await Client.findOne({ clientname: cleanedName, address: cleanedAddress });
         if (client) {
             return Response.json(
                 {
@@ -59,7 +68,7 @@ export const POST = async (req) => {
                 }
             );
         }
-        const newClient = new Client({ clientname, address, gstNumber, phone });
+        const newClient = new Client({ clientname: cleanedName, address: cleanedAddress, gstNumber: String(gstNumber || "").trim().toUpperCase(), phone: String(phone || "").trim(), openingBalance: opening, creditLimit: limit });
         await newClient.save();
         return Response.json(
             {

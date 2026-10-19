@@ -2,7 +2,9 @@
 "use client";
 
 import axios from "axios";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import LoadingAnimation from "@/components/LoadingAnimation";
 import {
   Users,
   UserRoundPlus,
@@ -18,7 +20,6 @@ import {
   UserRound,
   CheckCircle2,
   AlertCircle,
-  LoaderCircle,
   ContactRound,
   ShieldCheck,
 } from "lucide-react";
@@ -28,6 +29,8 @@ const EMPTY_CLIENT = {
   address: "",
   gstNumber: "",
   phone: "",
+  openingBalance: "0",
+  creditLimit: "0",
 };
 
 export default function ClientDetails() {
@@ -104,6 +107,8 @@ export default function ClientDetails() {
       address: client.address.trim(),
       gstNumber: client.gstNumber.trim().toUpperCase(),
       phone: client.phone.trim(),
+      openingBalance: Number(client.openingBalance || 0),
+      creditLimit: Number(client.creditLimit || 0),
     };
 
     // Only Client Name and Business Address are mandatory.
@@ -143,39 +148,24 @@ export default function ClientDetails() {
   };
 
   return (
-    <main className="min-h-screen bg-[#080e1c] px-3 py-5 text-slate-100 sm:px-6 sm:py-8 lg:px-8">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <main className="min-h-screen w-full bg-slate-950 px-4 py-6 text-white sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl space-y-6">
         {/* Header */}
-        <section className="relative overflow-hidden rounded-3xl border border-slate-700/70 bg-gradient-to-br from-[#17243b] via-[#111b2e] to-[#0d1424] p-5 shadow-2xl shadow-black/20 sm:p-8">
-          <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-amber-400/10 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-24 left-1/3 h-48 w-48 rounded-full bg-blue-500/10 blur-3xl" />
-
-          <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-center">
-            <div className="flex items-start gap-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-400/10 text-amber-400 shadow-lg shadow-amber-950/20">
-                <Users size={29} strokeWidth={1.8} />
-              </div>
-
-              <div>
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-amber-300">
-                    Customer Management
-                  </span>
-                  <span className="flex items-center gap-1.5 text-xs text-slate-400">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                    Client directory
-                  </span>
-                </div>
-
-                <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                  Client Details
-                </h1>
-
-                <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">
-                  Manage customer information and business addresses.
-                  GST and phone details are optional.
+        <header className="mb-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="mb-2 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-amber-400" />
+                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-amber-400">
+                  Gurukrupa Agency
                 </p>
               </div>
+              <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+                Customers
+              </h1>
+              <p className="mt-2 text-sm text-slate-400">
+                Manage customer accounts, contact details, and business addresses.
+              </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
@@ -183,12 +173,13 @@ export default function ClientDetails() {
                 type="button"
                 onClick={fetchClients}
                 disabled={loading}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-amber-400/50 hover:text-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <RefreshCw
-                  size={16}
-                  className={loading ? "animate-spin" : ""}
-                />
+                {loading ? (
+                  <LoadingAnimation size={28} label="Loading clients" />
+                ) : (
+                  <RefreshCw size={16} />
+                )}
                 Refresh
               </button>
 
@@ -200,7 +191,7 @@ export default function ClientDetails() {
                     setSuccess("");
                     setShowForm(true);
                   }}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-400 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-amber-950/20 transition hover:bg-amber-300 active:scale-[0.98]"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-400 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-amber-300 active:scale-[0.98]"
                 >
                   <Plus size={18} strokeWidth={2.5} />
                   Add New Client
@@ -208,11 +199,11 @@ export default function ClientDetails() {
               )}
             </div>
           </div>
-        </section>
+        </header>
 
         {/* Summary Cards */}
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-slate-700/70 bg-[#111a2b] p-5 transition hover:border-amber-400/30">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 transition hover:border-amber-400/30">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-slate-400">
@@ -231,7 +222,7 @@ export default function ClientDetails() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-700/70 bg-[#111a2b] p-5 transition hover:border-blue-400/30">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 transition hover:border-blue-400/30">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-slate-400">
@@ -250,7 +241,7 @@ export default function ClientDetails() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-700/70 bg-[#111a2b] p-5 transition hover:border-emerald-400/30">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 transition hover:border-emerald-400/30">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-slate-400">
@@ -309,8 +300,8 @@ export default function ClientDetails() {
 
         {/* Add Client Form */}
         {showForm && (
-          <section className="overflow-hidden rounded-2xl border border-amber-400/20 bg-[#111a2b] shadow-xl shadow-black/10">
-            <div className="flex items-center justify-between gap-3 border-b border-slate-700/70 bg-gradient-to-r from-amber-400/10 to-transparent px-5 py-5 sm:px-7">
+        <section className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-800 bg-slate-950/70 px-5 py-5 sm:px-7">
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-400/10 text-amber-400">
                   <UserRoundPlus size={22} />
@@ -360,7 +351,7 @@ export default function ClientDetails() {
                       placeholder="Enter client or business name"
                       autoComplete="organization"
                       required
-                      className="w-full rounded-xl border border-slate-700 bg-[#0b1220] py-3 pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-amber-400/70 focus:ring-2 focus:ring-amber-400/10"
+                      className="w-full rounded-xl border border-slate-700 bg-slate-950 py-3 pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-amber-400/70 focus:ring-2 focus:ring-amber-400/10"
                     />
                   </div>
                 </div>
@@ -389,7 +380,7 @@ export default function ClientDetails() {
                       onChange={handleChange}
                       placeholder="Enter GSTIN if available"
                       autoComplete="off"
-                      className="w-full rounded-xl border border-slate-700 bg-[#0b1220] py-3 pl-10 pr-4 text-sm uppercase text-white outline-none transition placeholder:text-slate-600 focus:border-amber-400/70 focus:ring-2 focus:ring-amber-400/10"
+                      className="w-full rounded-xl border border-slate-700 bg-slate-950 py-3 pl-10 pr-4 text-sm uppercase text-white outline-none transition placeholder:text-slate-500 focus:border-amber-400/70 focus:ring-2 focus:ring-amber-400/10"
                     />
                   </div>
                 </div>
@@ -418,9 +409,18 @@ export default function ClientDetails() {
                       onChange={handleChange}
                       placeholder="Enter contact number if available"
                       autoComplete="tel"
-                      className="w-full rounded-xl border border-slate-700 bg-[#0b1220] py-3 pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-amber-400/70 focus:ring-2 focus:ring-amber-400/10"
+                      className="w-full rounded-xl border border-slate-700 bg-slate-950 py-3 pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-amber-400/70 focus:ring-2 focus:ring-amber-400/10"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label htmlFor="openingBalance" className="mb-2 block text-sm font-semibold text-slate-200">Opening balance (₹)</label>
+                  <input id="openingBalance" type="number" name="openingBalance" min="0" step="0.01" value={client.openingBalance} onChange={handleChange} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white" />
+                </div>
+                <div>
+                  <label htmlFor="creditLimit" className="mb-2 block text-sm font-semibold text-slate-200">Credit limit (₹)</label>
+                  <input id="creditLimit" type="number" name="creditLimit" min="0" step="0.01" value={client.creditLimit} onChange={handleChange} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white" />
                 </div>
 
                 {/* Business Address - Required */}
@@ -445,7 +445,7 @@ export default function ClientDetails() {
                       rows={3}
                       autoComplete="street-address"
                       required
-                      className="w-full resize-y rounded-xl border border-slate-700 bg-[#0b1220] py-3 pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-amber-400/70 focus:ring-2 focus:ring-amber-400/10"
+                      className="w-full resize-y rounded-xl border border-slate-700 bg-slate-950 py-3 pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-amber-400/70 focus:ring-2 focus:ring-amber-400/10"
                     />
                   </div>
                 </div>
@@ -468,7 +468,7 @@ export default function ClientDetails() {
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-400 px-6 py-3 text-sm font-bold text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submitting ? (
-                    <LoaderCircle size={18} className="animate-spin" />
+                    <LoadingAnimation size={28} label="Saving client" />
                   ) : (
                     <Save size={18} />
                   )}
@@ -480,7 +480,7 @@ export default function ClientDetails() {
         )}
 
         {/* Client Directory */}
-        <section className="overflow-hidden rounded-2xl border border-slate-700/70 bg-[#111a2b] shadow-xl shadow-black/10">
+        <section className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
           <div className="flex flex-col gap-4 border-b border-slate-700/70 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-400/10 text-amber-400">
@@ -507,17 +507,14 @@ export default function ClientDetails() {
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search name, GST, phone, address..."
                 aria-label="Search clients"
-                className="w-full rounded-xl border border-slate-700 bg-[#0b1220] py-3 pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/10"
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 py-3 pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/10"
               />
             </div>
           </div>
 
           {loading ? (
             <div className="flex min-h-64 flex-col items-center justify-center px-5 py-12 text-center">
-              <LoaderCircle
-                size={34}
-                className="animate-spin text-amber-400"
-              />
+              <LoadingAnimation size={72} label="Loading client directory" />
               <p className="mt-4 text-sm font-semibold text-slate-200">
                 Loading client directory
               </p>
@@ -575,7 +572,7 @@ export default function ClientDetails() {
               <div className="hidden overflow-x-auto md:block">
                 <table className="w-full min-w-[760px] text-left">
                   <thead>
-                    <tr className="border-b border-slate-700/70 bg-[#0d1525]">
+                    <tr className="border-b border-slate-800 bg-slate-950/70">
                       <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
                         #
                       </th>
@@ -591,6 +588,7 @@ export default function ClientDetails() {
                       <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
                         Phone
                       </th>
+                      <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Account</th>
                     </tr>
                   </thead>
 
@@ -654,6 +652,7 @@ export default function ClientDetails() {
                             <span>{c.phone || "—"}</span>
                           </div>
                         </td>
+                        <td className="px-6 py-5"><Link href={`/dashboard/client/${c._id}`} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-amber-300 hover:bg-slate-800">View statement</Link></td>
                       </tr>
                     ))}
                   </tbody>
@@ -665,7 +664,7 @@ export default function ClientDetails() {
                 {filteredClients.map((c, index) => (
                   <article
                     key={c._id || `${c.clientname}-${c.phone}-${index}`}
-                    className="rounded-2xl border border-slate-700/80 bg-[#0d1525] p-4 transition hover:border-amber-400/30"
+                    className="rounded-2xl border border-slate-800 bg-slate-900 p-4 transition hover:border-amber-400/30"
                   >
                     <div className="flex items-start gap-3">
                       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-400/10 text-lg font-bold text-amber-300">
@@ -708,12 +707,13 @@ export default function ClientDetails() {
                         </p>
                       </div>
                     </div>
+                    <Link href={`/dashboard/client/${c._id}`} className="mt-4 inline-flex rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-amber-300 hover:bg-slate-800">View account statement</Link>
                   </article>
                 ))}
               </div>
 
               {/* Footer */}
-              <div className="flex flex-col gap-2 border-t border-slate-700/70 bg-[#0d1525]/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+              <div className="flex flex-col gap-2 border-t border-slate-800 bg-slate-950/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                 <p className="text-xs text-slate-500">
                   Showing{" "}
                   <span className="font-semibold text-slate-300">

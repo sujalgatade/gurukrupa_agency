@@ -3,24 +3,38 @@
 
 import axios from "axios";
 import { useEffect, useMemo, useState } from "react";
+import LoadingAnimation from "@/components/LoadingAnimation";
 
 const Payment = () => {
   const [bills, setBills] = useState([]);
+  const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [paymentAmounts, setPaymentAmounts] = useState({});
+  const [paymentMethods, setPaymentMethods] = useState({});
+  const [openingAmounts, setOpeningAmounts] = useState({});
+  const [openingMethods, setOpeningMethods] = useState({});
+
+  const outstandingFor = (bill) => bill.isPaid ? 0 : Math.max(0, Number(bill.total || 0) - Number(bill.paidAmount || 0) - Number(bill.returnedAmount || 0) - Number(bill.creditApplied || 0));
+  const openingDueFor = (client) => Math.max(0, Number(client.openingBalance || 0) - Number(client.openingBalancePaid || 0));
 
   const fetchBills = async () => {
     setLoading(true);
     setError("");
 
     try {
-      const res = await axios.get("/api/bill?paymentStatus=unpaid");
-      setBills(res.data.data || []);
+      const [billResponse, clientResponse] = await Promise.all([
+        axios.get("/api/bill?paymentStatus=unpaid"),
+        axios.get("/api/client"),
+      ]);
+      setBills(billResponse.data.data || []);
+      setClients(clientResponse.data.data || []);
     } catch (e) {
       console.error("Error fetching unpaid bills:", e);
       setBills([]);
+      setClients([]);
       setError("Unable to load unpaid bills. Please try again.");
     } finally {
       setLoading(false);
@@ -31,26 +45,50 @@ const Payment = () => {
     fetchBills();
   }, []);
 
-  const handlePaid = async (billId) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to mark this invoice as paid?"
-    );
-
-    if (!confirmed) return;
-
+  const handlePaid = async (bill) => {
+    const billId = bill._id;
+    const amount = Number(paymentAmounts[billId] ?? outstandingFor(bill));
+    const method = paymentMethods[billId] || "Cash";
+    if (!Number.isFinite(amount) || amount <= 0 || amount > outstandingFor(bill)) {
+      setError(`Enter a payment between ₹0.01 and ${formatCurrency(outstandingFor(bill))}.`);
+      return;
+    }
     setProcessingId(billId);
     setError("");
 
     try {
-      await axios.put(`/api/bill?id=${billId}`);
-
-      // Remove the invoice from the unpaid list after successful update.
-      setBills((prevBills) =>
-        prevBills.filter((bill) => bill._id !== billId)
-      );
+      const response = await axios.put(`/api/bill?id=${billId}`, { amount, method });
+      const saved = response.data?.data;
+      if (saved?.isPaid) setBills((prev) => prev.filter((entry) => entry._id !== billId));
+      else setBills((prev) => prev.map((entry) => entry._id === billId ? { ...entry, ...saved, client: entry.client } : entry));
+      setPaymentAmounts((prev) => ({ ...prev, [billId]: "" }));
+      setError("");
     } catch (e) {
       console.error("Error updating payment:", e);
       setError("Unable to update payment status. Please try again.");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleOpeningPaid = async (client) => {
+    const clientId = client._id;
+    const amount = Number(openingAmounts[clientId] ?? openingDueFor(client));
+    const method = openingMethods[clientId] || "Cash";
+    if (!Number.isFinite(amount) || amount <= 0 || amount > openingDueFor(client)) {
+      setError(`Enter a payment between ₹0.01 and ${formatCurrency(openingDueFor(client))}.`);
+      return;
+    }
+    const operationId = `opening-${clientId}`;
+    setProcessingId(operationId);
+    setError("");
+    try {
+      const response = await axios.post("/api/client-payment", { clientId, amount, method });
+      const saved = response.data?.data;
+      if (saved) setClients((prev) => prev.map((entry) => entry._id === clientId ? saved : entry));
+      setOpeningAmounts((prev) => ({ ...prev, [clientId]: "" }));
+    } catch (exception) {
+      setError(exception.response?.data?.message || "Unable to record opening balance payment.");
     } finally {
       setProcessingId(null);
     }
@@ -75,9 +113,9 @@ const Payment = () => {
   }, [bills, searchTerm]);
 
   const totalAmount = useMemo(
-    () =>
-      bills.reduce((sum, bill) => sum + (Number(bill.total) || 0), 0),
-    [bills]
+    () => bills.reduce((sum, bill) => sum + outstandingFor(bill), 0)
+      + clients.reduce((sum, client) => sum + openingDueFor(client), 0),
+    [bills, clients]
   );
 
   const formatCurrency = (amount) =>
@@ -107,27 +145,6 @@ const Payment = () => {
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {/* Header */}
         <header className="mb-8">
-          <a
-            href="/dashboard"
-            className="mb-6 inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:border-amber-400/50 hover:bg-slate-800 hover:text-amber-300"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="h-4 w-4"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="m15 18-6-6 6-6"
-              />
-            </svg>
-            Back to Dashboard
-          </a>
-
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="mb-2 flex items-center gap-2">
@@ -152,25 +169,14 @@ const Payment = () => {
               disabled={loading}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-amber-400/50 hover:text-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M20 7v5h-5M4 17v-5h5"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M5.5 9a7 7 0 0 1 11.8-2L20 12M4 12l2.7 5a7 7 0 0 0 11.8-2"
-                />
-              </svg>
+              {loading ? (
+                <LoadingAnimation size={30} label="Loading payments" />
+              ) : (
+                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20 7v5h-5M4 17v-5h5" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5.5 9a7 7 0 0 1 11.8-2L20 12M4 12l2.7 5a7 7 0 0 0 11.8-2" />
+                </svg>
+              )}
               Refresh
             </button>
           </div>
@@ -217,12 +223,12 @@ const Payment = () => {
           <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-lg shadow-black/10">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm text-slate-400">Outstanding Amount</p>
+                <p className="text-sm text-slate-400">Total Customer Receivables</p>
                 <p className="mt-2 break-words text-2xl font-bold text-amber-400 sm:text-3xl">
                   {loading ? "—" : formatCurrency(totalAmount)}
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  Total value of unpaid invoices
+                  Unpaid invoices and opening balances
                 </p>
               </div>
 
@@ -245,6 +251,21 @@ const Payment = () => {
             </div>
           </div>
         </section>
+
+        {/* <section className="mb-6 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
+          <div className="border-b border-slate-800 px-5 py-4 sm:px-6">
+            <h2 className="font-bold">Opening balance receipts</h2>
+            <p className="mt-1 text-sm text-slate-400">Record payments against customer balances brought forward into this system.</p>
+          </div>
+          {clients.filter((client) => openingDueFor(client) > 0).length ? <div className="divide-y divide-slate-800">
+            {clients.filter((client) => openingDueFor(client) > 0).map((client) => <div key={client._id} className="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_150px_150px_auto] sm:items-end sm:px-6">
+              <div className="min-w-0"><p className="truncate font-semibold">{client.clientname}</p><p className="truncate text-xs text-slate-400">{client.address || "Customer account"}</p><p className="mt-1 text-sm font-bold text-amber-400">Due {formatCurrency(openingDueFor(client))}</p></div>
+              <div><label htmlFor={`opening-payment-${client._id}`} className="mb-1.5 block text-xs text-slate-400">Payment amount</label><input id={`opening-payment-${client._id}`} type="number" min="0.01" max={openingDueFor(client)} step="0.01" value={openingAmounts[client._id] ?? openingDueFor(client)} onChange={(event) => setOpeningAmounts((prev) => ({ ...prev, [client._id]: event.target.value }))} className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white" /></div>
+              <div><label htmlFor={`opening-method-${client._id}`} className="mb-1.5 block text-xs text-slate-400">Method</label><select id={`opening-method-${client._id}`} value={openingMethods[client._id] || "Cash"} onChange={(event) => setOpeningMethods((prev) => ({ ...prev, [client._id]: event.target.value }))} className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white"><option>Cash</option><option>UPI</option><option>Bank</option><option>Cheque</option><option>Other</option></select></div>
+              <button type="button" onClick={() => handleOpeningPaid(client)} disabled={processingId === `opening-${client._id}`} className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-50">{processingId === `opening-${client._id}` ? <span className="inline-flex items-center gap-1"><LoadingAnimation size={26} label="Saving receipt" />Saving…</span> : "Record receipt"}</button>
+            </div>)}
+          </div> : <p className="px-5 py-6 text-sm text-slate-400 sm:px-6">No customer opening balances are due.</p>}
+        </section> */}
 
         {/* Search */}
         <section className="mb-6 rounded-2xl border border-slate-800 bg-slate-900 p-4 sm:p-5">
@@ -336,7 +357,7 @@ const Payment = () => {
 
           {loading ? (
             <div className="px-5 py-16 text-center text-slate-400">
-              <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-slate-700 border-t-amber-400" />
+              <div className="mb-3 flex justify-center"><LoadingAnimation size={64} label="Loading unpaid invoices" /></div>
               Loading unpaid invoices...
             </div>
           ) : !error && filteredBills.length > 0 ? (
@@ -386,19 +407,24 @@ const Payment = () => {
                       </td>
 
                       <td className="whitespace-nowrap px-5 py-4 text-right font-bold text-amber-400">
-                        {formatCurrency(bill.total)}
+                        {formatCurrency(outstandingFor(bill))}
                       </td>
 
-                      <td className="px-5 py-4 text-center">
+                      <td className="px-5 py-4">
+                        <div className="flex min-w-36 flex-col gap-2">
+                        <label className="sr-only" htmlFor={`payment-amount-${bill._id}`}>Amount to receive for invoice {bill.invoiceNumber}</label>
+                        <input id={`payment-amount-${bill._id}`} type="number" min="0.01" max={outstandingFor(bill)} step="0.01" value={paymentAmounts[bill._id] ?? outstandingFor(bill)} onChange={(event) => setPaymentAmounts((prev) => ({ ...prev, [bill._id]: event.target.value }))} className="w-32 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+                        <label className="sr-only" htmlFor={`payment-method-${bill._id}`}>Payment method for invoice {bill.invoiceNumber}</label>
+                        <select id={`payment-method-${bill._id}`} value={paymentMethods[bill._id] || "Cash"} onChange={(event) => setPaymentMethods((prev) => ({ ...prev, [bill._id]: event.target.value }))} className="w-32 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"><option>Cash</option><option>UPI</option><option>Bank</option><option>Cheque</option><option>Other</option></select>
                         <button
                           type="button"
-                          onClick={() => handlePaid(bill._id)}
+                          onClick={() => handlePaid(bill)}
                           disabled={processingId === bill._id}
                           className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-300 ring-1 ring-emerald-500/20 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {processingId === bill._id ? (
                             <>
-                              <span className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-300/30 border-t-emerald-300" />
+                              <LoadingAnimation size={28} label="Recording payment" />
                               Updating
                             </>
                           ) : (
@@ -417,10 +443,10 @@ const Payment = () => {
                                   d="m5 12 4 4L19 6"
                                 />
                               </svg>
-                              Mark Paid
+                              Record payment
                             </>
                           )}
-                        </button>
+                        </button></div>
                       </td>
                     </tr>
                   ))}
@@ -474,7 +500,7 @@ const Payment = () => {
 
           {loading ? (
             <div className="rounded-2xl border border-slate-800 bg-slate-900 px-5 py-12 text-center text-slate-400">
-              <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-slate-700 border-t-amber-400" />
+              <div className="mb-3 flex justify-center"><LoadingAnimation size={64} label="Loading unpaid invoices" /></div>
               Loading unpaid invoices...
             </div>
           ) : !error && filteredBills.length > 0 ? (
@@ -546,21 +572,24 @@ const Payment = () => {
                     <div className="text-right">
                       <p className="text-xs text-slate-500">Amount Due</p>
                       <p className="mt-1 text-xl font-bold text-amber-400">
-                        {formatCurrency(bill.total)}
+                        {formatCurrency(outstandingFor(bill))}
                       </p>
                     </div>
                   </div>
                 </div>
 
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                <div><label className="mb-2 block text-xs text-slate-400" htmlFor={`mobile-payment-amount-${bill._id}`}>Payment amount</label><input id={`mobile-payment-amount-${bill._id}`} type="number" min="0.01" max={outstandingFor(bill)} step="0.01" value={paymentAmounts[bill._id] ?? outstandingFor(bill)} onChange={(event) => setPaymentAmounts((prev) => ({ ...prev, [bill._id]: event.target.value }))} className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white" /></div>
+                <div><label className="mb-2 block text-xs text-slate-400" htmlFor={`mobile-payment-method-${bill._id}`}>Method</label><select id={`mobile-payment-method-${bill._id}`} value={paymentMethods[bill._id] || "Cash"} onChange={(event) => setPaymentMethods((prev) => ({ ...prev, [bill._id]: event.target.value }))} className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white"><option>Cash</option><option>UPI</option><option>Bank</option><option>Cheque</option><option>Other</option></select></div>
                 <button
                   type="button"
-                  onClick={() => handlePaid(bill._id)}
+                  onClick={() => handlePaid(bill)}
                   disabled={processingId === bill._id}
-                  className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="col-span-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {processingId === bill._id ? (
                     <>
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                      <LoadingAnimation size={28} label="Recording payment" />
                       Updating Payment...
                     </>
                   ) : (
@@ -579,10 +608,10 @@ const Payment = () => {
                           d="m5 12 4 4L19 6"
                         />
                       </svg>
-                      Mark as Paid
+                      Record payment
                     </>
                   )}
-                </button>
+                </button></div>
               </article>
             ))
           ) : !error ? (
@@ -608,7 +637,7 @@ const Payment = () => {
               <p className="mt-2 text-2xl font-bold text-amber-400">
                 {formatCurrency(
                   filteredBills.reduce(
-                    (sum, bill) => sum + (Number(bill.total) || 0),
+                    (sum, bill) => sum + outstandingFor(bill),
                     0
                   )
                 )}

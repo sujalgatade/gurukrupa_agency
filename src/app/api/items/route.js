@@ -79,10 +79,19 @@ export const GET = async (req) => {
   }
 };
 export const POST = async (req) => {
-  const { itemname, quantity } = await req.json();
   try {
+    const { itemname, quantity, box, itemperbox, originalrate, date } = await req.json();
+    if (!String(itemname || "").trim()) {
+      return Response.json({ message: "Product name is required.", success: false }, { status: 400 });
+    }
     await dbConnect();
-    const res = await Item.create({ itemname, quantity });
+    const res = await Item.create({
+      itemname: String(itemname).trim(),
+      box: Number(box ?? quantity ?? 0),
+      itemperbox: Number(itemperbox || 0),
+      originalrate: Number(originalrate || 0),
+      date: date ? new Date(date) : new Date(),
+    });
     return Response.json(
       { message: "Item added successfully.", success: true, data: res },
       { status: 200 },
@@ -95,17 +104,20 @@ export const POST = async (req) => {
   }
 };
 export const PUT = async (req) => {
-  const { id, quantity } = await req.json();
-  console.log(id, quantity);
   try {
+    const { id, box, quantity } = await req.json();
+    if (!id || !Number.isFinite(Number(box ?? quantity)) || Number(box ?? quantity) < 0) {
+      return Response.json({ message: "A product ID and non-negative box quantity are required.", success: false }, { status: 400 });
+    }
     await dbConnect();
-    const res = await Item.findByIdAndUpdate({ _id: id }, { quantity });
+    const res = await Item.findByIdAndUpdate(id, { box: Number(box ?? quantity) }, { new: true, runValidators: true });
     if (!res) {
       return Response.json(
         { message: "Item Not found", success: false },
         { status: 404 },
       );
     }
+    return Response.json({ message: "Stock updated successfully.", success: true, data: res }, { status: 200 });
   } catch (e) {
     console.log(e);
     return Response.json(

@@ -2,6 +2,7 @@
 
 import axios from "axios";
 import { useEffect, useMemo, useState } from "react";
+import LoadingAnimation from "@/components/LoadingAnimation";
 
 const MONTHS = [
   "January",
@@ -212,20 +213,12 @@ const Orders = () => {
       <header className="border-b border-slate-800 bg-slate-950/95">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
           <div className="flex items-center gap-4">
-            <a
-              href="/dashboard"
-              className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border border-slate-700 px-4 text-sm font-medium text-slate-300 transition hover:border-amber-400 hover:bg-slate-900 hover:text-amber-300"
-            >
-              <span aria-hidden="true">←</span>
-              Back
-            </a>
-
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-400">
                 Gurukrupa Agency
               </p>
               <h1 className="mt-1 text-2xl font-bold sm:text-3xl">
-                Product Box Summary
+                Search Orders 
               </h1>
             </div>
           </div>
@@ -368,14 +361,14 @@ const Orders = () => {
 
             <span className="w-fit rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-slate-300">
               {isLoading
-                ? "Loading..."
+                ? <span className="inline-flex items-center gap-1"><LoadingAnimation size={24} label="Loading orders" />Loading...</span>
                 : `${productSummary.length} product records`}
             </span>
           </div>
 
           {isLoading ? (
             <div className="flex flex-col items-center justify-center px-5 py-20 text-center">
-              <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-700 border-t-amber-400" />
+              <LoadingAnimation size={72} label="Loading product quantities" />
               <p className="mt-4 text-sm text-slate-400">
                 Loading product quantities...
               </p>

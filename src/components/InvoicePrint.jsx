@@ -6,12 +6,12 @@ const InvoicePrint = ({ invoiceData }) => {
 
   return (
     <div
+      className="invoice-print-page"
       style={{
         backgroundColor: "white",
         boxSizing: "border-box",
         fontFamily: "Arial, sans-serif",
         color: "#000",
-        pageBreakAfter: "always",
       }}
     >
       {/* Header */}
@@ -28,15 +28,20 @@ const InvoicePrint = ({ invoiceData }) => {
       >
         {/* Agency Information */}
         <div style={{ flex: 1 }}>
-          <h2
+          <img
+            src="/Gurukrupa%20logo.png"
+            alt="Gurukrupa Agency"
             style={{
-              fontSize: "24px",
-              fontWeight: "bold",
+              display: "block",
+              width: "170px",
+              maxWidth: "100%",
+              height: "auto",
+              maxHeight: "52px",
+              objectFit: "contain",
+              objectPosition: "left center",
               margin: "0 0 10px 0",
             }}
-          >
-            Gurukrupa Agency
-          </h2>
+          />
 
           <div
             style={{
@@ -45,14 +50,14 @@ const InvoicePrint = ({ invoiceData }) => {
             }}
           >
             <p style={{ margin: "2px 0" }}>
-              <strong>GSTIN:</strong> 27BXJPG3749K1Z1
+              <strong>Contact Number : </strong> 9579749504
             </p>
             <p style={{ margin: "6px 0 0 0" }}>
-              <strong>FDA Lic. No.:</strong> 21525086001585
+              <strong>Address : </strong> Peth Vadgaon,Kolhapur,416112.
             </p>
 
             <p style={{ margin: "2px 0" }}>
-              <strong>Bank Details:</strong>
+              <strong>Bank Details:- </strong>
             </p>
 
             <p style={{ margin: "2px 0" }}>
@@ -95,17 +100,24 @@ const InvoicePrint = ({ invoiceData }) => {
             Invoice Number : {invoiceData?.invoiceNumber || "-"}
           </p>
 
-          <p style={{ fontSize: "13px", margin: "6px 0" }}>
-            Date:{" "}
-            {invoiceData?.issueDate
-              ? new Date(invoiceData.issueDate).toLocaleDateString("en-IN")
-              : "-"}
-          </p>
+          
+          <p style={{ margin: "2px 0" }}>
+              <strong>GSTIN:</strong> 27BXJPG3749K1Z1
+            </p>
+            <p style={{ margin: "6px 0 0 0" }}>
+              <strong>FDA Lic. No.:</strong> 21525086001585
+            </p>
         </div>
       </div>
 
       {/* Customer Information */}
       <div style={{ marginBottom: "32px",fontSize: "12px" }}>
+        <p style={{ fontSize: "13px", margin: "6px 0" }}>
+            Date:{" "}
+            {invoiceData?.issueDate
+              ? new Date(invoiceData.issueDate).toLocaleDateString("en-IN")
+              : "-"}
+          </p>
         <h3 style={{ fontWeight: "600", marginBottom: "8px",fontSize:"14px" }}>
           Bill To:
         </h3>
@@ -211,7 +223,7 @@ const InvoicePrint = ({ invoiceData }) => {
                   textAlign: "center",
                 }}
               >
-                {item.quantity}
+                {item.quantity*item.boxQty}
               </td>
               <td
                 style={{
@@ -256,16 +268,35 @@ const InvoicePrint = ({ invoiceData }) => {
           </span>
         </p>
 
+        {/* <p>
+          Discount:{" "}
+          <span style={{ fontWeight: "600" }}>− ₹{formatAmount(invoiceData?.discount)}</span>
+        </p> */}
+
         <p>
-          Tax (5%):{" "}
+          CGST ({Number(invoiceData?.taxRate || 0)/2}%):{" "}
           <span style={{ fontWeight: "600" }}>
-            ₹{formatAmount(invoiceData?.tax)}
+            ₹{formatAmount(invoiceData?.tax)/2}
+          </span>
+        </p>
+        <p>
+          SGST ({Number(invoiceData?.taxRate || 0)/2}%):{" "}
+          <span style={{ fontWeight: "600" }}>
+            ₹{formatAmount(invoiceData?.tax)/2}
           </span>
         </p>
 
         <p style={{ fontSize: "18px", fontWeight: "bold" }}>
           Total: ₹{formatAmount(invoiceData?.total)}
         </p>
+        {Number(invoiceData?.returnedAmount || 0) > 0 && <>
+          <p>Sales return credit: <span style={{ fontWeight: "600" }}>− ₹{formatAmount(invoiceData.returnedAmount)}</span></p>
+          <p>Net invoice after returns: <span style={{ fontWeight: "600" }}>₹{formatAmount(Number(invoiceData.total || 0) - Number(invoiceData.returnedAmount || 0))}</span></p>
+          <p>Payments received: <span style={{ fontWeight: "600" }}>₹{formatAmount(invoiceData.paidAmount || 0)}</span></p>
+          {Number(invoiceData.creditApplied || 0) > 0 && <p>Customer credit applied: <span style={{ fontWeight: "600" }}>− ₹{formatAmount(invoiceData.creditApplied)}</span></p>}
+          <p style={{ fontSize: "16px", fontWeight: "bold" }}>Current balance: ₹{formatAmount(Math.max(0, Number(invoiceData.total || 0) - Number(invoiceData.returnedAmount || 0) - Number(invoiceData.paidAmount || 0) - Number(invoiceData.creditApplied || 0)))}</p>
+        </>}
+        {Number(invoiceData?.creditApplied || 0) > 0 && !Number(invoiceData?.returnedAmount || 0) && <p>Customer credit applied: − ₹{formatAmount(invoiceData.creditApplied)}</p>}
       </div>
 
       {/* Notes */}

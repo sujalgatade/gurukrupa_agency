@@ -1,8 +1,10 @@
  "use client";
 
 import axios from "axios";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import LoadingAnimation from "@/components/LoadingAnimation";
 
 const Bill = () => {
   const router = useRouter();
@@ -70,88 +72,60 @@ const Bill = () => {
   };
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-slate-950 text-white">
-      {/* Background decoration */}
-      <div
-        className="pointer-events-none fixed inset-0 overflow-hidden"
-        aria-hidden="true"
-      >
-        <div className="absolute -top-40 right-0 h-96 w-96 rounded-full bg-amber-400/[0.07] blur-3xl" />
-        <div className="absolute bottom-0 left-0 h-80 w-80 rounded-full bg-blue-500/[0.06] blur-3xl" />
-      </div>
+    <main className="min-h-screen w-full bg-slate-950 text-white">
+      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <header className="mb-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="mb-2 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-amber-400" />
+                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-amber-400">
+                  Gurukrupa Agency
+                </p>
+              </div>
+              <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+                Invoices
+              </h1>
+              <p className="mt-2 text-sm text-slate-400">
+                View, search, and manage all your business invoices in one place.
+              </p>
+            </div>
 
-      <div className="relative mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-8 lg:px-10">
-        {/* Top navigation */}
-        <header className="mb-8 flex flex-col gap-4 border-b border-white/10 pb-6 sm:flex-row sm:items-center sm:justify-between">
-          <a
-            href="/dashboard"
-            className="inline-flex w-fit items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:border-amber-300/40 hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              className="h-5 w-5"
-              aria-hidden="true"
+            <button
+              type="button"
+              onClick={() => router.push("/dashboard/createbill")}
+              className="inline-flex min-h-12 items-center justify-center gap-2 self-start rounded-xl bg-amber-400 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-amber-300 active:scale-[0.98] sm:self-auto"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15.75 19.5 8.25 12l7.5-7.5"
-              />
-            </svg>
-            Back to Dashboard
-          </a>
-
-          <button
-            type="button"
-            onClick={() => router.push("/dashboard/createbill")}
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-amber-300 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-amber-950/20 transition hover:bg-amber-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:px-6"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="h-5 w-5"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 5v14m-7-7h14"
-              />
-            </svg>
-            Create New Bill
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="h-5 w-5"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 5v14m-7-7h14"
+                />
+              </svg>
+              Create New Bill
+            </button>
+          </div>
         </header>
 
-        {/* Page title */}
-        <section className="mb-8">
-          <div className="mb-3 flex items-center gap-2">
-            <span className="h-1 w-8 rounded-full bg-amber-300" />
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-300">
-              Billing Management
-            </span>
-          </div>
-
-          <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            Invoices
-          </h1>
-
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
-            View, search, and manage all your business invoices in one place.
-          </p>
-        </section>
+        <nav className="billing-tabs" aria-label="Billing and sales views">
+          <Link href="/dashboard/bill" aria-current="page">Invoices</Link>
+          <Link href="/dashboard/billinghistory">Sales history</Link>
+        </nav>
 
         {/* Summary and search */}
-        <section className="mb-6 rounded-2xl border border-white/10 bg-slate-900/70 p-4 shadow-xl shadow-black/10 sm:p-6">
+        <section className="mb-6 rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow-lg shadow-black/10 sm:p-5">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-amber-300/20 bg-amber-300/10 text-amber-300">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-400/10 text-amber-400">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 24 24"
@@ -181,7 +155,7 @@ const Bill = () => {
               </div>
             </div>
 
-            <span className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-slate-400">
+            <span className="rounded-lg border border-slate-800 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-400">
               Invoice Register
             </span>
           </div>
@@ -211,7 +185,7 @@ const Bill = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search by invoice number, client, or amount..."
                 aria-label="Search invoices"
-                className="h-12 w-full rounded-xl border border-white/10 bg-slate-950/70 pl-12 pr-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-amber-300/60 focus:ring-2 focus:ring-amber-300/10"
+                className="h-12 w-full rounded-xl border border-slate-700 bg-slate-950 pl-12 pr-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/10"
               />
             </div>
 
@@ -219,7 +193,7 @@ const Bill = () => {
               <button
                 type="button"
                 onClick={() => setSearchTerm("")}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-5 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-5 text-sm font-medium text-slate-300 transition hover:bg-slate-700 hover:text-white"
               >
                 Clear Search
               </button>
@@ -243,14 +217,14 @@ const Bill = () => {
 
         {/* Loading state */}
         {loading ? (
-          <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-900/50 px-4 py-12 text-center">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-700 border-t-amber-300" />
+          <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 px-4 py-12 text-center">
+            <LoadingAnimation size={72} label="Loading invoices" />
             <p className="mt-4 text-sm text-slate-400">
               Loading your invoices...
             </p>
           </div>
         ) : filteredBills.length > 0 ? (
-          <main className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <section className="grid grid-cols-1 gap-4 lg:grid-cols-2" aria-label="Invoices">
             {filteredBills.map((bill) => (
               <article
                 key={bill._id}
@@ -264,15 +238,15 @@ const Bill = () => {
                     openBill(bill._id);
                   }
                 }}
-                className="group relative cursor-pointer overflow-hidden rounded-2xl border border-white/10 bg-slate-900/80 p-5 shadow-lg shadow-black/10 transition duration-300 hover:-translate-y-0.5 hover:border-amber-300/30 hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 sm:p-6"
+                className="group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-lg shadow-black/10 transition duration-300 hover:-translate-y-0.5 hover:border-amber-400/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 sm:p-6"
               >
                 {/* Accent line */}
-                <div className="absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 bg-amber-300 transition-transform duration-300 group-hover:scale-x-100" />
+                <div className="absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 bg-amber-400 transition-transform duration-300 group-hover:scale-x-100" />
 
                 {/* Invoice header */}
-                <div className="flex items-start justify-between gap-3 border-b border-white/[0.08] pb-5">
+                <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-5">
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-amber-300/20 bg-amber-300/10 text-amber-300 transition group-hover:bg-amber-300 group-hover:text-slate-950">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-400/10 text-amber-400 transition group-hover:bg-amber-400 group-hover:text-slate-950">
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 24 24"
@@ -327,12 +301,12 @@ const Bill = () => {
                 </div>
 
                 {/* Amount and action */}
-                <div className="flex flex-col gap-4 rounded-xl border border-white/[0.06] bg-slate-950/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-950 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="mb-1 text-xs font-medium uppercase tracking-wider text-slate-500">
                       Total Amount
                     </p>
-                    <p className="text-2xl font-bold tracking-tight text-amber-300 sm:text-3xl">
+                    <p className="text-2xl font-bold tracking-tight text-amber-400 sm:text-3xl">
                       ₹{formatCurrency(bill.total)}
                     </p>
                   </div>
@@ -343,7 +317,7 @@ const Bill = () => {
                       e.stopPropagation();
                       openBill(bill._id);
                     }}
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-amber-300/30 bg-amber-300/10 px-4 py-2.5 text-sm font-semibold text-amber-200 transition hover:border-amber-300 hover:bg-amber-300 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-2.5 text-sm font-semibold text-amber-300 transition hover:border-amber-400 hover:bg-amber-400 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
                   >
                     View Details
                     <svg
@@ -365,11 +339,11 @@ const Bill = () => {
                 </div>
               </article>
             ))}
-          </main>
+          </section>
         ) : (
           /* Empty state */
-          <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 bg-slate-900/40 px-5 py-12 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-slate-500">
+          <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-700 bg-slate-900 px-5 py-12 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-800 bg-slate-800 text-slate-500">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
@@ -401,7 +375,7 @@ const Bill = () => {
               <button
                 type="button"
                 onClick={() => setSearchTerm("")}
-                className="mt-5 rounded-xl border border-white/10 bg-white/[0.05] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                className="mt-5 rounded-xl border border-slate-700 bg-slate-800 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700"
               >
                 Clear Search
               </button>
@@ -409,7 +383,7 @@ const Bill = () => {
               <button
                 type="button"
                 onClick={() => router.push("/dashboard/createbill")}
-                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-amber-300 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-amber-200"
+                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-amber-400 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-amber-300"
               >
                 <span className="text-lg leading-none">+</span>
                 Create Your First Bill
@@ -419,13 +393,13 @@ const Bill = () => {
         )}
 
         {/* Footer */}
-        <footer className="mt-10 border-t border-white/10 py-5 text-center">
+        <footer className="mt-10 border-t border-slate-800 py-5 text-center">
           <p className="text-xs text-slate-500 sm:text-sm">
             © {new Date().getFullYear()} Gurukrupa Agency. All rights reserved.
           </p>
         </footer>
       </div>
-    </div>
+    </main>
   );
 };
 

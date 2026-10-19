@@ -17,6 +17,12 @@ const itemSchema = new Schema({
     type: Number,
     default: 0,
   },
+  purchaseRatePerBox: {
+    type: Number,
+    default: 0,
+  },
+  purchaseId: { type: mongoose.Schema.Types.ObjectId, ref: "Purchase" },
+  purchaseItemIndex: { type: Number },
   itemperbox: {
     type: Number,
     default: 0,
