@@ -133,8 +133,8 @@ const PurchaseHistory = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [month, setMonth] = useState(String(now.getMonth() + 1));
-  const [year, setYear] = useState(String(now.getFullYear()));
+  const [month, setMonth] = useState("");
+  const [year, setYear] = useState("");
   const [selectedDay, setSelectedDay] = useState("");
   const [search, setSearch] = useState("");
 
@@ -143,26 +143,20 @@ const PurchaseHistory = () => {
     setError("");
 
     try {
-      // Fetch purchase records from your existing buy API route.
-      const response = await axios.get("/api/items", {
-        params: {
-          month,
-          year,
-        },
-      });
-      console.log(response);
+      // Fetch stock lots from the items API.
+      const response = await axios.get("/api/items");
       setPurchases(normalizePurchaseResponse(response.data));
     } catch (err) {
       console.error("Error fetching purchase history:", err);
       setPurchases([]);
       setError(
         err?.response?.data?.message ||
-          "Unable to load purchase history. Check your /api/buy route and try again.",
+          "Unable to load stock. Check your /api/items route and try again.",
       );
     } finally {
       setLoading(false);
     }
-  }, [month, year]);
+  }, []);
 
   useEffect(() => {
     fetchPurchases();
@@ -170,7 +164,10 @@ const PurchaseHistory = () => {
 
   // Days available in the selected month and year.
   const daysInMonth = useMemo(
-    () => new Date(Number(year), Number(month), 0).getDate(),
+    () =>
+      month && year
+        ? new Date(Number(year), Number(month), 0).getDate()
+        : 31,
     [month, year],
   );
 
@@ -182,7 +179,6 @@ const PurchaseHistory = () => {
   }, [selectedDay, daysInMonth]);
 
   // Filter by selected month/year, optional day, and search term.
-  // Sort oldest first and display the first 10 matching records.
   const filteredPurchases = useMemo(() => {
     const term = search.trim().toLowerCase();
 
@@ -197,8 +193,8 @@ const PurchaseHistory = () => {
 
         const [purchaseYear, purchaseMonth, purchaseDay] = dateKey.split("-");
 
-        if (purchaseYear !== year) return false;
-        if (Number(purchaseMonth) !== Number(month)) return false;
+        if (year && purchaseYear !== year) return false;
+        if (month && Number(purchaseMonth) !== Number(month)) return false;
 
         if (selectedDay && Number(purchaseDay) !== Number(selectedDay)) {
           return false;
@@ -231,13 +227,12 @@ const PurchaseHistory = () => {
         const createdB = new Date(b?.createdAt || 0).getTime();
 
         return createdA - createdB;
-      })
-      .slice(0, 10);
+      });
   }, [purchases, month, year, selectedDay, search]);
 
   const clearFilters = () => {
-    setMonth(String(now.getMonth() + 1));
-    setYear(String(now.getFullYear()));
+    setMonth("");
+    setYear("");
     setSelectedDay("");
     setSearch("");
   };
@@ -245,8 +240,8 @@ const PurchaseHistory = () => {
   const hasFilters =
     selectedDay !== "" ||
     search.trim() !== "" ||
-    month !== String(now.getMonth() + 1) ||
-    year !== String(now.getFullYear());
+    month !== "" ||
+    year !== "";
 
   return (
     <main className="min-h-screen w-full bg-slate-950 text-white">
@@ -305,26 +300,18 @@ const PurchaseHistory = () => {
 
         {/* Summary */}
         <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {/* <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <p className="text-sm text-slate-400">Matching Records Shown</p>
-            <p className="mt-2 text-3xl font-bold text-amber-400">
-              {loading ? "—" : filteredPurchases.length}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              Latest 10 matching purchase records maximum
-            </p>
-          </div> */}
-
           <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
             <p className="text-sm text-slate-400">Selected Period</p>
             <p className="mt-2 text-xl font-bold">
-              {MONTHS.find((item) => item.value === Number(month))?.label}{" "}
-              {year}
+              {month
+                ? MONTHS.find((item) => item.value === Number(month))?.label
+                : "All Months"}{" "}
+              {year || "All Years"}
             </p>
             <p className="mt-1 text-xs text-slate-500">
               {selectedDay
                 ? `Filtered to day ${selectedDay}`
-                : "Showing all days in the selected month"}
+                : "Showing all days in the selected period"}
             </p>
           </div>
         </section>
@@ -355,6 +342,7 @@ const PurchaseHistory = () => {
                 }}
                 className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-amber-400"
               >
+                <option value="">All Months</option>
                 {MONTHS.map((item) => (
                   <option key={item.value} value={String(item.value)}>
                     {item.label}
@@ -379,6 +367,7 @@ const PurchaseHistory = () => {
                 }}
                 className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-amber-400"
               >
+                <option value="">All Years</option>
                 {Array.from({ length: 10 }, (_, index) => {
                   const optionYear = now.getFullYear() - index;
 
