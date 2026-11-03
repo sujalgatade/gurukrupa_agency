@@ -89,6 +89,7 @@ const Orders = () => {
   };
 
   const getProductName = (item) =>
+    item?.itemname ??
     item?.productName ??
     item?.productname ??
     item?.name ??
@@ -97,18 +98,25 @@ const Orders = () => {
     item?.product?.name ??
     "Unnamed Product";
 
-  const getBoxQuantity = (item) => {
-    const value =
-      item?.boxQuantity ??
-      item?.boxQty ??
-      item?.box ??
-      item?.boxes ??
-      item?.quantityOfBoxes ??
-      item?.quantity ??
-      0;
+  const getQuantityInPieces = (item) => {
+    const unitsPerBox = Math.round(Number(item?.quantity || item?.unitsPerBox || item?.itemperbox || 0));
+    if (item?.boxQty !== undefined && unitsPerBox > 0) {
+      const soldPieces = Number(item.boxQty || 0) * unitsPerBox + Number(item.itemQty || 0);
+      const returnedPieces = Number(item.returnedBoxes || 0) * unitsPerBox + Number(item.returnedItemQty || 0);
+      return {
+        unitsPerBox,
+        totalPieces: Math.max(0, Math.round(soldPieces - returnedPieces)),
+      };
+    }
 
-    const quantity = Number(value);
-    return Number.isFinite(quantity) ? quantity : 0;
+    const value = Number(
+      item?.boxQuantity ?? item?.box ?? item?.boxes ?? item?.quantityOfBoxes ?? item?.quantity ?? 0,
+    );
+    const legacyUnitsPerBox = Math.max(1, Math.round(Number(item?.unitsPerBox || item?.itemperbox || 1)));
+    return {
+      unitsPerBox: legacyUnitsPerBox,
+      totalPieces: Number.isFinite(value) ? Math.max(0, Math.round(value * legacyUnitsPerBox)) : 0,
+    };
   };
 
   // Calculate the number of days in the selected month/year.
@@ -141,22 +149,28 @@ const Orders = () => {
 
       const items = Array.isArray(bill.items) ? bill.items : [];
       items.forEach((item) => {
-        const productName = item.itemname;
-        const key = `${dateKey}__${productName.toLowerCase()}`;
+        const productName = getProductName(item);
+        const { unitsPerBox, totalPieces } = getQuantityInPieces(item);
+        const key = `${dateKey}__${productName.toLowerCase()}__${unitsPerBox}`;
 
         if (!summary.has(key)) {
           summary.set(key, {
             date: dateKey,
             productName,
-            totalBoxes: 0,
+            unitsPerBox,
+            totalPieces: 0,
           });
         }
 
-        summary.get(key).totalBoxes += getBoxQuantity(item);
+        summary.get(key).totalPieces += totalPieces;
       });
     });
 
-    return Array.from(summary.values()).sort((a, b) => {
+    return Array.from(summary.values(), (item) => ({
+      ...item,
+      fullBoxes: Math.floor(item.totalPieces / item.unitsPerBox),
+      loosePieces: item.totalPieces % item.unitsPerBox,
+    })).sort((a, b) => {
       const dateComparison = b.date.localeCompare(a.date);
       if (dateComparison !== 0) return dateComparison;
 
@@ -165,7 +179,24 @@ const Orders = () => {
   }, [bills, selectedDay, selectedMonth, selectedYear]);
 
   const totalBoxes = useMemo(
-    () => productSummary.reduce((total, item) => total + item.totalBoxes, 0),
+    () => productSummary.reduce((total, item) => total + item.fullBoxes, 0),
+    [productSummary],
+  );
+  const totalLoosePieces = useMemo(
+    () => productSummary.reduce((total, item) => total + item.loosePieces, 0),
+    [productSummary],
+  );
+  const quantityRows = useMemo(
+    () => productSummary.flatMap((item) => {
+      const rows = [];
+      if (item.fullBoxes > 0 || item.loosePieces === 0) {
+        rows.push({ ...item, type: "boxes", quantity: item.fullBoxes });
+      }
+      if (item.loosePieces > 0) {
+        rows.push({ ...item, type: "loose", quantity: item.loosePieces });
+      }
+      return rows;
+    }),
     [productSummary],
   );
 
@@ -224,10 +255,11 @@ const Orders = () => {
           </div>
 
           <div className="rounded-xl border border-slate-800 bg-slate-900 px-5 py-3">
-            <p className="text-xs text-slate-400">Total Box Quantity</p>
+            <p className="text-xs text-slate-400">Total Full Boxes</p>
             <p className="mt-1 text-2xl font-bold text-amber-400">
               {isLoading ? "—" : totalBoxes.toLocaleString("en-IN")}
             </p>
+            {!isLoading && <p className="mt-1 text-xs text-slate-400">Loose pieces: {totalLoosePieces.toLocaleString("en-IN")}</p>}
           </div>
         </div>
       </header>
@@ -239,8 +271,7 @@ const Orders = () => {
             Product Quantity Register
           </h2>
           <p className="mt-1 text-sm text-slate-400">
-            Filter by day, month, and year to view the total box quantity for
-            each product.
+            Filter by day, month, and year to view full boxes and loose pieces separately.
           </p>
         </section>
 
@@ -352,10 +383,10 @@ const Orders = () => {
           <div className="flex flex-col gap-3 border-b border-slate-800 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div>
               <h2 className="font-semibold text-white">
-                Product Box Quantity Details
+                Product Quantity Details
               </h2>
               <p className="mt-1 text-sm text-slate-400">
-                Product quantities are combined across all matching bills.
+                Matching bills are combined by date and product. Loose pieces appear on their own row.
               </p>
             </div>
 
@@ -418,21 +449,22 @@ const Orders = () => {
           ) : (
             <>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[600px] text-left text-sm">
+                <table className="w-full min-w-[700px] text-left text-sm">
                   <thead className="bg-slate-950/80 text-xs uppercase tracking-wider text-slate-400">
                     <tr>
                       <th className="px-5 py-4 font-semibold sm:px-6">Date</th>
                       <th className="px-5 py-4 font-semibold">Product Name</th>
+                      <th className="px-5 py-4 font-semibold">Quantity Type</th>
                       <th className="px-5 py-4 text-right font-semibold sm:px-6">
-                        Total Quantity (Boxes)
+                        Quantity
                       </th>
                     </tr>
                   </thead>
 
                   <tbody className="divide-y divide-slate-800">
-                    {productSummary.map((item) => (
+                    {quantityRows.map((item) => (
                       <tr
-                        key={`${item.date}-${item.productName}`}
+                        key={`${item.date}-${item.productName}-${item.unitsPerBox}-${item.type}`}
                         className="transition hover:bg-slate-800/50"
                       >
                         <td className="whitespace-nowrap px-5 py-4 text-slate-300 sm:px-6">
@@ -441,9 +473,12 @@ const Orders = () => {
                         <td className="px-5 py-4 font-medium text-white">
                           {item.productName}
                         </td>
+                        <td className="px-5 py-4 text-slate-300">
+                          {item.type === "boxes" ? "Full boxes" : "Loose pieces"}
+                        </td>
                         <td className="px-5 py-4 text-right sm:px-6">
                           <span className="inline-flex min-w-14 justify-center rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-1.5 font-bold text-amber-300">
-                            {item.totalBoxes.toLocaleString("en-IN")}
+                            {item.quantity.toLocaleString("en-IN")}
                           </span>
                         </td>
                       </tr>
@@ -453,10 +488,10 @@ const Orders = () => {
                   <tfoot className="border-t border-slate-700 bg-slate-950/70">
                     <tr>
                       <td
-                        colSpan={2}
+                        colSpan={3}
                         className="px-5 py-4 font-semibold text-white sm:px-6"
                       >
-                        Total Boxes
+                        Total Full Boxes
                       </td>
                       <td className="px-5 py-4 text-right sm:px-6">
                         <span className="text-lg font-bold text-amber-400">
@@ -464,12 +499,18 @@ const Orders = () => {
                         </span>
                       </td>
                     </tr>
+                    <tr>
+                      <td colSpan={3} className="px-5 py-4 font-semibold text-white sm:px-6">Total Loose Pieces</td>
+                      <td className="px-5 py-4 text-right sm:px-6">
+                        <span className="text-lg font-bold text-sky-300">{totalLoosePieces.toLocaleString("en-IN")}</span>
+                      </td>
+                    </tr>
                   </tfoot>
                 </table>
               </div>
 
               <div className="border-t border-slate-800 px-5 py-3 text-xs text-slate-500 sm:px-6">
-                The same product is combined across all bills for each date.
+                Loose pieces are counted separately and are never shown as decimal boxes.
               </div>
             </>
           )}
