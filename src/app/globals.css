@@ -1744,7 +1744,8 @@ html[data-theme="dark"] .table-wrap td {
   .workspace-sidebar,
   .workspace-topbar,
   .workspace-scrim,
-  button {
+  button,
+  .invoice-screen-actions {
     display: none !important;
   }
   .workspace-main {

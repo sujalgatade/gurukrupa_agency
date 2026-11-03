@@ -6,38 +6,34 @@ export const GET = async (req) => {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("unique");
     const bill = searchParams.get("bill", "false");
+    const stockHistory = searchParams.get("stockHistory") === "true";
     await dbConnect();
     let res = null;
     if (id == "true") {
       if (bill == "true") {
-        res = await Item.aggregate([
-          {
-            $sort: { date: -1, _id: -1 },
-          },
-          {
-            $group: {
-              _id: {
-                itemname: "$itemname",
-                itemperbox: "$itemperbox",
-              },
-              doc: { $first: "$$ROOT" },
-              totalBox: { $sum: "$box" },
-            },
-          },
-          {
-            $set: {
-              "doc.box": "$totalBox",
-            },
-          },
-          {
-            $replaceRoot: {
-              newRoot: "$doc",
-            },
-          },
-          {
-            $sort: { date: -1 },
-          },
-        ]);
+        const lots = await Item.find({}).sort({ date: -1, _id: -1 }).lean();
+        const grouped = new Map();
+        for (const lot of lots) {
+          const unitsPerBox = Math.max(0, Number(lot.itemperbox || 0));
+          const rawBoxes = Math.max(0, Number(lot.box || 0));
+          const fullBoxes = Math.floor(rawBoxes + 0.000001);
+          const legacyLoose = unitsPerBox
+            ? Math.round((rawBoxes - fullBoxes) * unitsPerBox)
+            : 0;
+          const key = `${String(lot.itemname || "").trim().toLocaleLowerCase("en-IN")}::${unitsPerBox}`;
+          if (!grouped.has(key)) {
+            grouped.set(key, { ...lot, box: 0, looseQty: 0 });
+          }
+          const product = grouped.get(key);
+          product.box += fullBoxes;
+          product.looseQty += Math.max(0, Number(lot.looseQty || 0)) + legacyLoose;
+        }
+        res = [...grouped.values()].map((product) => ({
+          ...product,
+          box: Number(product.box || 0),
+          looseQty: Number(product.looseQty || 0),
+        }));
+        res.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
       } else {
         res = await Item.aggregate([
           {
@@ -60,7 +56,15 @@ export const GET = async (req) => {
         ]);
       }
     } else {
-      res = await Item.find({}).sort({ date: -1 });
+      res = await Item.find({}).sort({ date: -1, _id: -1 }).lean();
+      if (stockHistory) {
+        res = res.map((lot) => {
+          const rawBoxes = Number(lot.box || 0);
+          const fractionalLoose = rawBoxes % 1 > 0.000001 && Number(lot.itemperbox || 0) > 0;
+          const hasLooseStock = Number(lot.looseQty || 0) > 0 || fractionalLoose;
+          return hasLooseStock ? { ...lot, looseDate: lot.date ?? null } : lot;
+        });
+      }
     }
     return Response.json(
       {

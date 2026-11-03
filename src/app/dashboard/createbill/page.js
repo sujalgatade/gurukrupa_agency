@@ -12,12 +12,16 @@ const getLocalDateInputValue = () => {
   return localDate.toISOString().slice(0, 10);
 };
 
+const getAvailableUnits = (item) =>
+  Math.max(0, Number(item?.box || 0) * Number(item?.quantity || 0) + Number(item?.looseQty || 0));
+
 const CreateBill = () => {
   const [items, setItems] = useState([
     {
       id: "",
       quantity: 0,
       boxQty: 0,
+      itemQty: 0,
       rate: 0,
       amount: 0,
       originalRate: 0,
@@ -115,7 +119,11 @@ const CreateBill = () => {
         ...item,
         rate: parseFloat(newRate.toFixed(2)),
         originalRate: origRate,
-        amount: (item.quantity || 0) * newRate * item.boxQty,
+        amount: Number((
+          ((Number(item.quantity) || 0) * Number(item.boxQty || 0) +
+            Number(item.itemQty || 0)) *
+          newRate
+        ).toFixed(2)),
       };
     });
     console.log(updatedItems);
@@ -126,18 +134,13 @@ const CreateBill = () => {
 
   // Calculate subtotal, tax, and total
   useEffect(() => {
-    let newSubtotal = 0;
-
-    items.forEach((item) => {
-      newSubtotal += item.amount;
-    });
-
+    const newSubtotal = Number(items.reduce((sum, item) => sum + Number(item.amount || 0), 0).toFixed(2));
     const taxableAmount = Math.max(0, newSubtotal - discount);
-    const calculatedTax = (taxableAmount * taxRate) / 100;
+    const calculatedTax = Number(((taxableAmount * taxRate) / 100).toFixed(2));
 
     setSubtotal(newSubtotal);
     setTaxAmount(calculatedTax);
-    setTotal(taxableAmount + calculatedTax);
+    setTotal(Number((taxableAmount + calculatedTax).toFixed(2)));
   }, [items, taxRate, discount]);
 
   // Handle item input changes
@@ -155,7 +158,10 @@ const CreateBill = () => {
         id: selectedItem._id, // Store ID for dropdown
         itemname: selectedItem.itemname, // Keep product name
         box: selectedItem.box,
+        looseQty: selectedItem.looseQty || 0,
         quantity: selectedItem.itemperbox || 0,
+        boxQty: 0,
+        itemQty: 0,
         originalRate: selectedItem.originalrate || 0,
         rate: selectedItem.originalrate || 0,
       };
@@ -166,18 +172,34 @@ const CreateBill = () => {
       };
     }
 
-    if (field === "boxQty" && updated[index].box !== undefined) {
-      updated[index].boxQty = Math.min(Number(value) || 0, updated[index].box);
+    if (field === "boxQty" && updated[index].quantity > 0) {
+      const maxBoxes = Math.floor(
+        Math.max(0, getAvailableUnits(updated[index]) - Number(updated[index].itemQty || 0)) /
+          Number(updated[index].quantity),
+      );
+      updated[index].boxQty = Math.max(0, Math.min(Number(value) || 0, maxBoxes));
+    }
+
+    if (field === "itemQty" && updated[index].quantity > 0) {
+      const maxLooseUnits = Math.max(
+        0,
+        Math.floor(
+          getAvailableUnits(updated[index]) -
+            Number(updated[index].boxQty || 0) * Number(updated[index].quantity),
+        ),
+      );
+      updated[index].itemQty = Math.max(0, Math.min(Number(value) || 0, maxLooseUnits));
     }
 
     if (field === "rate") {
       updated[index].originalRate = Number(value) || 0;
     }
 
-    updated[index].amount =
+    const totalUnits =
       (Number(updated[index].quantity) || 0) *
-      (Number(updated[index].rate) || 0) *
-      Number(updated[index].boxQty);
+        Number(updated[index].boxQty || 0) +
+      Number(updated[index].itemQty || 0);
+    updated[index].amount = Number((totalUnits * (Number(updated[index].rate) || 0)).toFixed(2));
 
     setItems(updated);
   };
@@ -199,6 +221,7 @@ const CreateBill = () => {
         id: "",
         quantity: 0,
         boxQty: 0,
+        itemQty: 0,
         rate: 0,
         amount: 0,
         originalRate: 0,
@@ -217,7 +240,12 @@ const CreateBill = () => {
     setSubmitError("");
     
     const filteredItems = items.filter(
-      (item) => item.id && item.amount > 0 && item.boxQty > 0,
+      (item) =>
+        item.id &&
+        item.amount > 0 &&
+        Number(item.quantity || 0) * Number(item.boxQty || 0) +
+          Number(item.itemQty || 0) >
+          0,
     );
 
     if (!client || !issueDate) {
@@ -226,7 +254,7 @@ const CreateBill = () => {
     }
     if (!filteredItems.length) {
       toast.error(
-        "Add at least one product with a box quantity before saving.",
+        "Add at least one product with a box or item quantity before saving.",
       );
       return;   
     }
@@ -253,7 +281,7 @@ const CreateBill = () => {
       });
 
       toast("Invoice Created Successfully !! ");
-      router.push(`/dashboard`);
+      router.push(`/dashboard/billout?id=${res.data.data._id}`);
     } catch (error) {
       toast.error(
         error.response?.data?.message ||
@@ -449,7 +477,7 @@ const CreateBill = () => {
               <div>
                 <h2 className="font-semibold text-white">Invoice Items</h2>
                 <p className="mt-1 text-xs text-slate-400">
-                  Add products, quantities, and rates.
+                  Add full boxes or loose pieces, and set their rate.
                 </p>
               </div>
             </div>
@@ -505,53 +533,77 @@ const CreateBill = () => {
 
                       {itemOptions.map((opt) => (
                         <option key={opt._id} value={opt._id}>
-                          {opt.itemname}
+                          {opt.itemname} · {Number(opt.box || 0)} boxes
+                          {Number(opt.looseQty || 0) > 0 ? ` + ${Number(opt.looseQty)} loose` : ""}
                         </option>
                       ))}
                     </select>
                   </div>
 
-                  {/* Quantity */}
-                  {/* <div className="lg:col-span-2">
-                    <label className={labelClass}>Quantity</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={item.quantity}
-                      onFocus={() => handleFocus(idx, "quantity")}
-                      onChange={(e) =>
-                        handleChange(
-                          idx,
-                          "quantity",
-                          parseFloat(e.target.value) || 0,
-                        )
-                      }
-                      className={inputClass}
-                      placeholder="0"
-                    />
-                  </div> */}
-
                   {/* Box quantity */}
-                  <div className="lg:col-span-2">
+                  <div className="sm:col-span-1 lg:col-span-2">
                     <label className={labelClass}>Box Qty</label>
                     <input
                       type="number"
                       min="0"
+                      max={
+                        item.quantity > 0
+                          ? Math.floor(
+                              Math.max(
+                                0,
+                                getAvailableUnits(item) -
+                                  Number(item.itemQty || 0),
+                              ) / Number(item.quantity),
+                            )
+                          : undefined
+                      }
+                      step="1"
                       value={item.boxQty || ""}
                       onChange={(e) =>
                         handleChange(
                           idx,
                           "boxQty",
-                          parseFloat(e.target.value) || 0,
+                          parseInt(e.target.value, 10) || 0,
                         )
                       }
                       className={inputClass}
                       placeholder="0"
                     />
+                    <p className="mt-1.5 text-xs text-slate-500">Complete boxes</p>
+                  </div>
+
+                  {/* Loose item quantity */}
+                  <div className="sm:col-span-1 lg:col-span-2">
+                    <label className={labelClass}>Item Qty (pieces)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max={Math.max(
+                        0,
+                        Math.floor(
+                          getAvailableUnits(item) -
+                            Number(item.boxQty || 0) * Number(item.quantity || 0),
+                        ),
+                      )}
+                      step="1"
+                      value={item.itemQty || ""}
+                      onChange={(e) =>
+                        handleChange(
+                          idx,
+                          "itemQty",
+                          parseInt(e.target.value, 10) || 0,
+                        )
+                      }
+                      className={inputClass}
+                      placeholder="0"
+                    />
+                    <p className="mt-1.5 text-xs text-slate-500">
+                      Only pieces? Set Box Qty to 0. {item.quantity || 0} pieces per box.
+                    </p>
                   </div>
 
                   {/* Rate */}
-                  <div className="lg:col-span-2">
+                  <div className="sm:col-span-1 lg:col-span-2">
                     <label className={labelClass}>Rate (₹)</label>
                     <input
                       type="number"
@@ -572,7 +624,7 @@ const CreateBill = () => {
                   </div>
 
                   {/* Amount */}
-                  <div className="lg:col-span-2">
+                  <div className="sm:col-span-1 lg:col-span-2">
                     <label className={labelClass}>Amount</label>
                     <div className="flex min-h-[48px] items-center rounded-xl border border-amber-400/20 bg-amber-400/5 px-3 py-3 font-semibold text-amber-300">
                       {formatCurrency(item.amount)}

@@ -149,14 +149,20 @@ const InvoicePrint = ({ invoiceData }) => {
           width: "100%",
           borderCollapse: "collapse",
           marginBottom: "24px",
+          color: "#111827",
+          fontSize: "13px",
+          printColorAdjust: "exact",
+          WebkitPrintColorAdjust: "exact",
         }}
       >
-        <thead style={{ backgroundColor: "#e5e7eb" }}>
+        <thead style={{ backgroundColor: "#cbd5e1", color: "#000000" }}>
           <tr>
             <th
               style={{
-                border: "1px solid #d1d5db",
-                padding: "8px",
+                border: "1px solid #475569",
+                padding: "9px 8px",
+                color: "#000000",
+                fontWeight: "700",
                 textAlign: "left",
               }}
             >
@@ -165,8 +171,10 @@ const InvoicePrint = ({ invoiceData }) => {
 
             <th
               style={{
-                border: "1px solid #d1d5db",
-                padding: "8px",
+                border: "1px solid #475569",
+                padding: "9px 8px",
+                color: "#000000",
+                fontWeight: "700",
                 textAlign: "center",
               }}
             >
@@ -174,8 +182,10 @@ const InvoicePrint = ({ invoiceData }) => {
             </th>
             <th
               style={{
-                border: "1px solid #d1d5db",
-                padding: "8px",
+                border: "1px solid #475569",
+                padding: "9px 8px",
+                color: "#000000",
+                fontWeight: "700",
                 textAlign: "center",
               }}
             >
@@ -184,8 +194,10 @@ const InvoicePrint = ({ invoiceData }) => {
 
             <th
               style={{
-                border: "1px solid #d1d5db",
-                padding: "8px",
+                border: "1px solid #475569",
+                padding: "9px 8px",
+                color: "#000000",
+                fontWeight: "700",
                 textAlign: "right",
               }}
             >
@@ -194,8 +206,10 @@ const InvoicePrint = ({ invoiceData }) => {
 
             <th
               style={{
-                border: "1px solid #d1d5db",
-                padding: "8px",
+                border: "1px solid #475569",
+                padding: "9px 8px",
+                color: "#000000",
+                fontWeight: "700",
                 textAlign: "right",
               }}
             >
@@ -209,8 +223,10 @@ const InvoicePrint = ({ invoiceData }) => {
             <tr key={item.id ?? index}>
               <td
                 style={{
-                  border: "1px solid #d1d5db",
+                  border: "1px solid #64748b",
                   padding: "8px",
+                  color: "#111827",
+                  fontWeight: "500",
                 }}
               >
                 {item.itemname}
@@ -218,17 +234,26 @@ const InvoicePrint = ({ invoiceData }) => {
 
               <td
                 style={{
-                  border: "1px solid #d1d5db",
+                  border: "1px solid #64748b",
                   padding: "8px",
+                  color: "#111827",
+                  fontWeight: "500",
                   textAlign: "center",
                 }}
               >
-                {item.quantity*item.boxQty}
+                {Number(item.quantity || 0) * Number(item.boxQty || 0) + Number(item.itemQty || 0)}
+                {Number(item.itemQty || 0) > 0 && (
+                  <small style={{ display: "block", fontSize: "10px" }}>
+                    ({Number(item.itemQty)} loose)
+                  </small>
+                )}
               </td>
               <td
                 style={{
-                  border: "1px solid #d1d5db",
+                  border: "1px solid #64748b",
                   padding: "8px",
+                  color: "#111827",
+                  fontWeight: "500",
                   textAlign: "center",
                 }}
               >
@@ -237,8 +262,10 @@ const InvoicePrint = ({ invoiceData }) => {
 
               <td
                 style={{
-                  border: "1px solid #d1d5db",
+                  border: "1px solid #64748b",
                   padding: "8px",
+                  color: "#111827",
+                  fontWeight: "500",
                   textAlign: "right",
                 }}
               >
@@ -247,8 +274,10 @@ const InvoicePrint = ({ invoiceData }) => {
 
               <td
                 style={{
-                  border: "1px solid #d1d5db",
+                  border: "1px solid #64748b",
                   padding: "8px",
+                  color: "#111827",
+                  fontWeight: "500",
                   textAlign: "right",
                 }}
               >

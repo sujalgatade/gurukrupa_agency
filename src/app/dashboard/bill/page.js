@@ -12,20 +12,29 @@ const Bill = () => {
   const [bills, setBills] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [deletingId, setDeletingId] = useState("");
 
   useEffect(() => {
+    let active = true;
     const fetchBills = async () => {
       try {
         const res = await axios.get("/api/bill");
-        setBills(res.data.data || []);
+        if (active) setBills(res.data.data || []);
       } catch (e) {
         console.error("Error fetching bills:", e);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     fetchBills();
+    window.addEventListener("focus", fetchBills);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", fetchBills);
+    };
   }, []);
 
   const filteredBills = useMemo(() => {
@@ -67,8 +76,24 @@ const Bill = () => {
     });
   };
 
-  const openBill = (id) => {
-    router.push(`/dashboard/billout?id=${id}`);
+  const openBill = (id, edit = false) => {
+    router.push(`/dashboard/billout?id=${id}${edit ? "&edit=1" : ""}`);
+  };
+
+  const deleteBill = async () => {
+    if (!deleteTarget || deletingId) return;
+    setDeletingId(deleteTarget._id);
+    setDeleteError("");
+    try {
+      const response = await axios.delete(`/api/bill?id=${deleteTarget._id}`, { data: { confirm: true } });
+      if (!response.data?.success) throw new Error(response.data?.message || "Bill could not be deleted.");
+      setBills((current) => current.filter((bill) => bill._id !== deleteTarget._id));
+      setDeleteTarget(null);
+    } catch (requestError) {
+      setDeleteError(requestError.response?.data?.message || requestError.message || "Bill could not be deleted.");
+    } finally {
+      setDeletingId("");
+    }
   };
 
   return (
@@ -228,17 +253,7 @@ const Bill = () => {
             {filteredBills.map((bill) => (
               <article
                 key={bill._id}
-                role="button"
-                tabIndex={0}
-                aria-label={`View invoice ${bill.invoiceNumber}`}
-                onClick={() => openBill(bill._id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    openBill(bill._id);
-                  }
-                }}
-                className="group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-lg shadow-black/10 transition duration-300 hover:-translate-y-0.5 hover:border-amber-400/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 sm:p-6"
+                className="group relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-lg shadow-black/10 transition duration-300 hover:-translate-y-0.5 hover:border-amber-400/30 sm:p-6"
               >
                 {/* Accent line */}
                 <div className="absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 bg-amber-400 transition-transform duration-300 group-hover:scale-x-100" />
@@ -311,31 +326,29 @@ const Bill = () => {
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openBill(bill._id);
-                    }}
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-2.5 text-sm font-semibold text-amber-300 transition hover:border-amber-400 hover:bg-amber-400 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
-                  >
-                    View Details
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      className="h-4 w-4"
-                      aria-hidden="true"
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openBill(bill._id)}
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M5 12h14m-6-6 6 6-6 6"
-                      />
-                    </svg>
-                  </button>
+                      View
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openBill(bill._id, true)}
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-2.5 text-sm font-semibold text-amber-300 transition hover:border-amber-400 hover:bg-amber-400 hover:text-slate-950"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setDeleteError(""); setDeleteTarget(bill); }}
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-400/30 bg-red-400/5 px-4 py-2.5 text-sm font-semibold text-red-300 transition hover:bg-red-500/15"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </article>
             ))}
@@ -398,6 +411,42 @@ const Bill = () => {
             © {new Date().getFullYear()} Gurukrupa Agency. All rights reserved.
           </p>
         </footer>
+
+        {deleteTarget && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" role="presentation">
+            <section
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="delete-bill-title"
+              aria-describedby="delete-bill-description"
+              className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"
+            >
+              <h2 id="delete-bill-title" className="text-xl font-bold text-white">Delete invoice #{deleteTarget.invoiceNumber}?</h2>
+              <p id="delete-bill-description" className="mt-3 text-sm leading-6 text-slate-300">
+                This removes the bill from Billing & Sales and returns its sold items to stock. Its invoice number stays reserved in the records. Customer credit used on this bill will be restored. Bills with payments or sales returns cannot be deleted safely.
+              </p>
+              {deleteError && <p role="alert" className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">{deleteError}</p>}
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  disabled={Boolean(deletingId)}
+                  onClick={() => { setDeleteTarget(null); setDeleteError(""); }}
+                  className="min-h-11 rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={Boolean(deletingId)}
+                  onClick={deleteBill}
+                  className="min-h-11 rounded-xl bg-red-500 px-4 py-2 text-sm font-bold text-white hover:bg-red-400 disabled:cursor-wait disabled:opacity-60"
+                >
+                  {deletingId ? "Deleting…" : "Yes, delete bill"}
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
       </div>
     </main>
   );

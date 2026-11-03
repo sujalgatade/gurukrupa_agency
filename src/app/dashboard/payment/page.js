@@ -27,7 +27,7 @@ const Payment = () => {
     try {
       const [billResponse, clientResponse] = await Promise.all([
         axios.get("/api/bill?paymentStatus=unpaid"),
-        axios.get("/api/client"),
+        axios.get("/api/client?includeArchived=true"),
       ]);
       setBills(billResponse.data.data || []);
       setClients(clientResponse.data.data || []);
@@ -259,7 +259,7 @@ const Payment = () => {
           </div>
           {clients.filter((client) => openingDueFor(client) > 0).length ? <div className="divide-y divide-slate-800">
             {clients.filter((client) => openingDueFor(client) > 0).map((client) => <div key={client._id} className="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_150px_150px_auto] sm:items-end sm:px-6">
-              <div className="min-w-0"><p className="truncate font-semibold">{client.clientname}</p><p className="truncate text-xs text-slate-400">{client.address || "Customer account"}</p><p className="mt-1 text-sm font-bold text-amber-400">Due {formatCurrency(openingDueFor(client))}</p></div>
+              <div className="min-w-0"><p className="truncate font-semibold">{client.clientname}{client.isDeleted && <span className="ml-2 rounded-full border border-slate-700 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Archived</span>}</p><p className="truncate text-xs text-slate-400">{client.address || "Customer account"}</p><p className="mt-1 text-sm font-bold text-amber-400">Due {formatCurrency(openingDueFor(client))}</p></div>
               <div><label htmlFor={`opening-payment-${client._id}`} className="mb-1.5 block text-xs text-slate-400">Payment amount</label><input id={`opening-payment-${client._id}`} type="number" min="0.01" max={openingDueFor(client)} step="0.01" value={openingAmounts[client._id] ?? openingDueFor(client)} onChange={(event) => setOpeningAmounts((prev) => ({ ...prev, [client._id]: event.target.value }))} className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white" /></div>
               <div><label htmlFor={`opening-method-${client._id}`} className="mb-1.5 block text-xs text-slate-400">Method</label><select id={`opening-method-${client._id}`} value={openingMethods[client._id] || "Cash"} onChange={(event) => setOpeningMethods((prev) => ({ ...prev, [client._id]: event.target.value }))} className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white"><option>Cash</option><option>UPI</option><option>Bank</option><option>Cheque</option><option>Other</option></select></div>
               <button type="button" onClick={() => handleOpeningPaid(client)} disabled={processingId === `opening-${client._id}`} className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-50">{processingId === `opening-${client._id}` ? <span className="inline-flex items-center gap-1"><LoadingAnimation size={26} label="Saving receipt" />Saving…</span> : "Record receipt"}</button>

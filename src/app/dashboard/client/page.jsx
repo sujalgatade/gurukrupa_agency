@@ -22,6 +22,8 @@ import {
   AlertCircle,
   ContactRound,
   ShieldCheck,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 
 const EMPTY_CLIENT = {
@@ -35,6 +37,10 @@ const EMPTY_CLIENT = {
 
 export default function ClientDetails() {
   const [showForm, setShowForm] = useState(false);
+  const [editingClientId, setEditingClientId] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [deletingId, setDeletingId] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [clients, setClients] = useState([]);
@@ -120,12 +126,15 @@ export default function ClientDetails() {
     setSubmitting(true);
 
     try {
-      const res = await axios.post("/api/client", cleanedClient);
+      const res = editingClientId
+        ? await axios.patch(`/api/client?id=${editingClientId}`, cleanedClient)
+        : await axios.post("/api/client", cleanedClient);
 
       if (res.data.success) {
         setClient({ ...EMPTY_CLIENT });
+        setEditingClientId("");
         setShowForm(false);
-        setSuccess("Client added successfully.");
+        setSuccess(editingClientId ? "Client updated successfully." : "Client added successfully.");
         await fetchClients();
       } else {
         setError(res.data.message || "Unable to add this client.");
@@ -143,8 +152,41 @@ export default function ClientDetails() {
 
   const closeForm = () => {
     setShowForm(false);
+    setEditingClientId("");
     setClient({ ...EMPTY_CLIENT });
     setError("");
+  };
+
+  const startEdit = (item) => {
+    setClient({
+      clientname: item.clientname || "",
+      address: item.address || "",
+      gstNumber: item.gstNumber || "",
+      phone: item.phone || "",
+      openingBalance: String(item.openingBalance || 0),
+      creditLimit: String(item.creditLimit || 0),
+    });
+    setEditingClientId(item._id);
+    setError("");
+    setSuccess("");
+    setShowForm(true);
+  };
+
+  const deleteClient = async () => {
+    if (!deleteTarget || deletingId) return;
+    setDeletingId(deleteTarget._id);
+    setDeleteError("");
+    try {
+      const response = await axios.delete(`/api/client?id=${deleteTarget._id}`, { data: { confirm: true } });
+      if (!response.data?.success) throw new Error(response.data?.message || "Client could not be deleted.");
+      setClients((current) => current.filter((item) => item._id !== deleteTarget._id));
+      setDeleteTarget(null);
+      setSuccess("Client removed from the active directory. Bills and account history are preserved.");
+    } catch (requestError) {
+      setDeleteError(requestError.response?.data?.message || requestError.message || "Client could not be deleted.");
+    } finally {
+      setDeletingId("");
+    }
   };
 
   return (
@@ -189,6 +231,8 @@ export default function ClientDetails() {
                   onClick={() => {
                     setError("");
                     setSuccess("");
+                    setEditingClientId("");
+                    setClient({ ...EMPTY_CLIENT });
                     setShowForm(true);
                   }}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-400 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-amber-300 active:scale-[0.98]"
@@ -298,7 +342,7 @@ export default function ClientDetails() {
           </div>
         )}
 
-        {/* Add Client Form */}
+        {/* Add/Edit Client Form */}
         {showForm && (
         <section className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
             <div className="flex items-center justify-between gap-3 border-b border-slate-800 bg-slate-950/70 px-5 py-5 sm:px-7">
@@ -308,7 +352,7 @@ export default function ClientDetails() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-white">
-                    Add New Client
+                    {editingClientId ? "Edit Client" : "Add New Client"}
                   </h2>
                   <p className="mt-1 text-xs text-slate-400">
                     Client Name and Business Address are required.
@@ -472,7 +516,7 @@ export default function ClientDetails() {
                   ) : (
                     <Save size={18} />
                   )}
-                  {submitting ? "Saving Client..." : "Save Client"}
+                  {submitting ? (editingClientId ? "Updating Client..." : "Saving Client...") : (editingClientId ? "Update Client" : "Save Client")}
                 </button>
               </div>
             </form>
@@ -589,6 +633,7 @@ export default function ClientDetails() {
                         Phone
                       </th>
                       <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Account</th>
+                      <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Actions</th>
                     </tr>
                   </thead>
 
@@ -653,6 +698,12 @@ export default function ClientDetails() {
                           </div>
                         </td>
                         <td className="px-6 py-5"><Link href={`/dashboard/client/${c._id}`} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-amber-300 hover:bg-slate-800">View statement</Link></td>
+                        <td className="px-6 py-5">
+                          <div className="flex items-center gap-2">
+                            <button type="button" onClick={() => startEdit(c)} aria-label={`Edit ${c.clientname}`} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-200 hover:border-amber-400/50 hover:text-amber-300"><Pencil size={14} />Edit</button>
+                            <button type="button" onClick={() => { setDeleteTarget(c); setDeleteError(""); }} aria-label={`Delete ${c.clientname}`} className="inline-flex items-center gap-1.5 rounded-lg border border-red-400/30 px-3 py-2 text-xs font-semibold text-red-300 hover:bg-red-500/10"><Trash2 size={14} />Delete</button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -708,6 +759,10 @@ export default function ClientDetails() {
                       </div>
                     </div>
                     <Link href={`/dashboard/client/${c._id}`} className="mt-4 inline-flex rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-amber-300 hover:bg-slate-800">View account statement</Link>
+                    <div className="mt-3 flex gap-2">
+                      <button type="button" onClick={() => startEdit(c)} className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-200 hover:border-amber-400/50 hover:text-amber-300"><Pencil size={14} />Edit</button>
+                      <button type="button" onClick={() => { setDeleteTarget(c); setDeleteError(""); }} className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-red-400/30 px-3 py-2 text-xs font-semibold text-red-300 hover:bg-red-500/10"><Trash2 size={14} />Delete</button>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -738,6 +793,20 @@ export default function ClientDetails() {
         <footer className="pb-2 text-center text-xs text-slate-600">
           Gurukrupa Agency · Client Management
         </footer>
+
+        {deleteTarget && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" role="presentation">
+            <section role="alertdialog" aria-modal="true" aria-labelledby="delete-client-title" aria-describedby="delete-client-description" className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+              <h2 id="delete-client-title" className="text-xl font-bold text-white">Delete {deleteTarget.clientname}?</h2>
+              <p id="delete-client-description" className="mt-3 text-sm leading-6 text-slate-300">This removes the client from the active directory. Existing bills and account history stay saved, and the client can still appear in payment records for any opening balance due.</p>
+              {deleteError && <p role="alert" className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">{deleteError}</p>}
+              <div className="mt-6 flex justify-end gap-3">
+                <button type="button" disabled={Boolean(deletingId)} onClick={() => { setDeleteTarget(null); setDeleteError(""); }} className="min-h-11 rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800 disabled:opacity-50">Cancel</button>
+                <button type="button" disabled={Boolean(deletingId)} onClick={deleteClient} className="min-h-11 rounded-xl bg-red-500 px-4 py-2 text-sm font-bold text-white hover:bg-red-400 disabled:cursor-wait disabled:opacity-60">{deletingId ? "Removing…" : "Yes, remove client"}</button>
+              </div>
+            </section>
+          </div>
+        )}
       </div>
     </main>
   );

@@ -29,10 +29,10 @@ import ThemeToggle from "@/components/ThemeToggle";
 import AiAssistantLauncher from "@/components/AiAssistantLauncher";
 
 const menu = [
-  { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Billing & Sales", href: "/dashboard/bill", icon: FileText },
   { label: "Customers", href: "/dashboard/client", icon: Users },
-  { label: "Inventory", href: "/dashboard/stock", icon: Boxes },
+  { label: "Stock", href: "/dashboard/stock", icon: Boxes },
   { label: "Purchases", href: "/dashboard/buy", icon: ShoppingCart },
   { label: "Payments", href: "/dashboard/payment", icon: Wallet },
   { label: "Orders", href: "/dashboard/orders", icon: Package },
@@ -181,22 +181,19 @@ export default function Dashboard() {
       (sum, entry) => sum + Number(entry.profitReduction || 0),
       0,
     );
-  const stockUnits = data.items.reduce(
-    (sum, item) => sum + Number(item.box || 0) * Number(item.itemperbox || 0),
-    0,
-  );
+  const unitsInStock = (item) =>
+    Number(item.box || 0) * Number(item.itemperbox || 0) + Number(item.looseQty || 0);
+  const stockUnits = data.items.reduce((sum, item) => sum + unitsInStock(item), 0);
   const stockValue = data.items.reduce(
-    (sum, item) =>
-      sum +
-      Number(item.box || 0) *
-        Number(item.itemperbox || 0) *
-        Number(item.originalrate || 0),
+    (sum, item) => sum + unitsInStock(item) * Number(item.originalrate || 0),
     0,
   );
-  const outOfStock = data.items.filter((item) => Number(item.box || 0) <= 0);
-  const lowStock = data.items.filter(
-    (item) => Number(item.box || 0) > 0 && Number(item.box || 0) <= 2,
-  );
+  const outOfStock = data.items.filter((item) => unitsInStock(item) <= 0);
+  const lowStock = data.items.filter((item) => {
+    const units = unitsInStock(item);
+    const twoBoxThreshold = Math.max(2, Number(item.itemperbox || 0) * 2);
+    return units > 0 && units <= twoBoxThreshold;
+  });
   const recentBills = [...data.bills]
     .sort(
       (a, b) =>
@@ -210,11 +207,14 @@ export default function Dashboard() {
       const name = line.itemname || "Unnamed product";
       totals[name] =
         (totals[name] || 0) +
-        Number(line.quantity || 0) *
-          Math.max(
-            0,
-            Number(line.boxQty || 0) - Number(line.returnedBoxes || 0),
-          );
+        Math.max(
+          0,
+          Number(line.quantity || 0) *
+            Number(line.boxQty || 0) +
+            Number(line.itemQty || 0) -
+            Number(line.quantity || 0) * Number(line.returnedBoxes || 0) -
+            Number(line.returnedItemQty || 0),
+        );
       return totals;
     }, {});
   const bestSeller = Object.entries(topProduct).sort((a, b) => b[1] - a[1])[0];
@@ -348,11 +348,11 @@ export default function Dashboard() {
               key={label}
               href={href}
               onClick={() => setMobileNav(false)}
-              className={`nav-link ${label === "Overview" ? "nav-active" : ""}`}
+              className={`nav-link ${href === "/dashboard" ? "nav-active" : ""}`}
             >
               <Icon size={18} strokeWidth={1.8} />
               <span>{label}</span>
-              {label === "Inventory" &&
+              {href === "/dashboard/stock" &&
                 lowStock.length + outOfStock.length > 0 && (
                   <b className="nav-count">
                     {lowStock.length + outOfStock.length}
@@ -614,8 +614,8 @@ export default function Dashboard() {
                         <small>{item.itemperbox || 0} pcs / box</small>
                       </span>
                       <span className="stock-qty">
-                        {item.box || 0}
-                        <small>boxes</small>
+                        {Number(item.box || 0)}
+                        <small>boxes{Number(item.looseQty || 0) > 0 ? ` + ${Number(item.looseQty)} loose` : ""}</small>
                       </span>
                     </div>
                   ))

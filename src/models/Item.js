@@ -9,6 +9,16 @@ const itemSchema = new Schema({
     type: Number,
     default: 0,
   },
+  // Open-box pieces are stored separately so box counts always stay whole.
+  looseQty: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+  looseDate: {
+    type: Date,
+    default: null,
+  },
   date: {
     type: Date,
     default: Date.now,
@@ -32,5 +42,16 @@ const itemSchema = new Schema({
     default: Date.now,
   },
 });
+
+// During Next.js hot reload, Mongoose can keep the old Item model in memory.
+// Rebuild it if that cached schema cannot persist the open-box stock fields.
+const cachedItemModel = mongoose.models.Item;
+if (
+  cachedItemModel &&
+  (!cachedItemModel.schema.path("looseQty") || !cachedItemModel.schema.path("looseDate"))
+) {
+  mongoose.deleteModel("Item");
+}
+
 const Item = mongoose.models.Item || mongoose.model("Item", itemSchema);
 export default Item;

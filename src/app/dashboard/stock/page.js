@@ -20,6 +20,8 @@ const MONTHS = [
 ];
 
 const getPurchaseDate = (purchase) =>
+  purchase?.rowDate ??
+  purchase?.looseDate ??
   purchase?.date ??
   purchase?.purchaseDate ??
   purchase?.buyDate ??
@@ -57,6 +59,8 @@ const getBoxQuantity = (purchase) =>
   purchase?.box ??
   purchase?.numberOfBoxes ??
   0;
+
+const getLooseQuantity = (purchase) => purchase?.looseQty ?? purchase?.looseQuantity ?? 0;
 
 const getBuyingRate = (purchase) =>
   purchase?.originalrate??
@@ -109,10 +113,50 @@ const formatCurrency = (value) => {
 };
 
 const getPurchaseId = (purchase, index) =>
+  purchase?.rowId ??
   purchase?._id ??
   purchase?.id ??
   purchase?.purchaseId ??
   `${getDateKey(getPurchaseDate(purchase))}-${index}`;
+
+const expandStockLots = (lots) =>
+  lots.flatMap((lot) => {
+    const unitsPerBox = Number(getItemQuantity(lot)) || 0;
+    const rawBoxes = Math.max(0, Number(getBoxQuantity(lot)) || 0);
+    const fullBoxes = Math.floor(rawBoxes + 0.000001);
+    const legacyLoose = unitsPerBox
+      ? Math.round((rawBoxes - fullBoxes) * unitsPerBox)
+      : 0;
+    let boxes = fullBoxes;
+    let loose = Math.max(0, Number(getLooseQuantity(lot)) || 0) + legacyLoose;
+    if (unitsPerBox > 0) {
+      boxes += Math.floor(loose / unitsPerBox);
+      loose %= unitsPerBox;
+    }
+
+    const rows = [];
+    if (boxes > 0) {
+      rows.push({
+        ...lot,
+        box: boxes,
+        looseQty: 0,
+        stockType: "Full boxes",
+        rowDate: lot.date ?? lot.purchaseDate ?? lot.buyDate ?? lot.createdAt ?? null,
+        rowId: `${getPurchaseId(lot, 0)}-boxes`,
+      });
+    }
+    if (loose > 0) {
+      rows.push({
+        ...lot,
+        box: 0,
+        looseQty: loose,
+        stockType: "Open box · loose pieces",
+        rowDate: lot.date ?? lot.purchaseDate ?? lot.buyDate ?? lot.createdAt ?? getPurchaseDate(lot),
+        rowId: `${getPurchaseId(lot, 0)}-loose`,
+      });
+    }
+    return rows;
+  });
 
 const normalizePurchaseResponse = (responseData) => {
   if (Array.isArray(responseData)) return responseData;
@@ -144,7 +188,7 @@ const PurchaseHistory = () => {
 
     try {
       // Fetch stock lots from the items API.
-      const response = await axios.get("/api/items");
+      const response = await axios.get("/api/items?stockHistory=true");
       setPurchases(normalizePurchaseResponse(response.data));
     } catch (err) {
       console.error("Error fetching purchase history:", err);
@@ -182,10 +226,9 @@ const PurchaseHistory = () => {
   const filteredPurchases = useMemo(() => {
     const term = search.trim().toLowerCase();
 
-    return purchases
+    return expandStockLots(purchases)
       .filter((purchase) => {
-        // Empty stock lots stay out of the inventory table.
-        if (Number(getBoxQuantity(purchase)) <= 0) return false;
+        if (Number(getBoxQuantity(purchase)) <= 0 && Number(getLooseQuantity(purchase)) <= 0) return false;
 
         const dateKey = getDateKey(getPurchaseDate(purchase));
 
@@ -230,6 +273,8 @@ const PurchaseHistory = () => {
       });
   }, [purchases, month, year, selectedDay, search]);
 
+  const stockRowCount = useMemo(() => expandStockLots(purchases).length, [purchases]);
+
   const clearFilters = () => {
     setMonth("");
     setYear("");
@@ -262,8 +307,8 @@ const PurchaseHistory = () => {
               </h1>
 
               <p className="mt-2 text-sm text-slate-400">
-                View purchase dates, product quantities, box quantities, and
-                buying rates.
+                See full boxes and remaining loose pieces separately, with the
+                date each stock row was received or opened.
               </p>
             </div>
 
@@ -432,9 +477,9 @@ const PurchaseHistory = () => {
               </span>{" "}
               of{" "}
               <span className="font-semibold text-white">
-                {loading ? "…" : purchases.length}
+                {loading ? "…" : stockRowCount}
               </span>{" "}
-              records returned by the API.
+              stock rows.
             </p>
 
             <button
@@ -471,21 +516,26 @@ const PurchaseHistory = () => {
           <div className="border-b border-slate-800 p-4 sm:p-6">
             <h2 className="text-xl font-bold">Available Stock</h2>
             <p className="mt-1 text-sm text-slate-400">
-              Sorted by oldest purchase date first.
+              Full boxes use the purchase date. Loose pieces use the bill date
+              when their box was opened. Oldest stock is listed first.
             </p>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[850px] text-left">
+            <table className="w-full min-w-[950px] text-left">
               <thead className="border-y border-slate-800 bg-slate-950/70">
                 <tr className="text-xs uppercase tracking-wider text-slate-400">
                   <th className="px-5 py-4 font-semibold">Date</th>
                   <th className="px-5 py-4 font-semibold">Product Name</th>
+                  <th className="px-5 py-4 font-semibold">Stock Type</th>
                   <th className="px-5 py-4 text-center font-semibold">
-                    Item Qty
+                    Pieces / Box
                   </th>
                   <th className="px-5 py-4 text-center font-semibold">
-                    Box Qty
+                    Full Boxes
+                  </th>
+                  <th className="px-5 py-4 text-center font-semibold">
+                    Loose Pieces
                   </th>
                   <th className="px-5 py-4 text-right font-semibold">
                     Buying Rate per Item
@@ -497,7 +547,7 @@ const PurchaseHistory = () => {
                 {loading ? (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={7}
                       className="px-5 py-16 text-center text-slate-400"
                     >
                       <div className="mb-3 flex justify-center"><LoadingAnimation size={64} label="Loading purchase records" /></div>
@@ -507,7 +557,7 @@ const PurchaseHistory = () => {
                 ) : error ? (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={7}
                       className="px-5 py-16 text-center text-slate-400"
                     >
                       Unable to display purchase records.
@@ -552,6 +602,12 @@ const PurchaseHistory = () => {
                         </div>
                       </td>
 
+                      <td className="px-5 py-4">
+                        <span className={`inline-flex rounded-lg px-3 py-1.5 text-xs font-semibold ${purchase.stockType?.startsWith("Open") ? "bg-amber-400/10 text-amber-300" : "bg-slate-800 text-slate-200"}`}>
+                          {purchase.stockType || "Stock"}
+                        </span>
+                      </td>
+
                       <td className="px-5 py-4 text-center">
                         <span className="inline-flex min-w-14 items-center justify-center rounded-lg bg-slate-800 px-3 py-1.5 text-sm font-semibold text-slate-200">
                           {Number(getItemQuantity(purchase)) || 0}
@@ -564,6 +620,12 @@ const PurchaseHistory = () => {
                         </span>
                       </td>
 
+                      <td className="px-5 py-4 text-center">
+                        <span className={`inline-flex min-w-14 items-center justify-center rounded-lg px-3 py-1.5 text-sm font-semibold ${Number(getLooseQuantity(purchase)) > 0 ? "bg-amber-400/10 text-amber-300" : "bg-slate-800 text-slate-500"}`}>
+                          {Number(getLooseQuantity(purchase)) || "—"}
+                        </span>
+                      </td>
+
                       <td className="whitespace-nowrap px-5 py-4 text-right font-semibold text-amber-300">
                         {formatCurrency(getBuyingRate(purchase))}
                       </td>
@@ -571,7 +633,7 @@ const PurchaseHistory = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="px-5 py-16 text-center">
+                    <td colSpan={7} className="px-5 py-16 text-center">
                       <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-800 text-slate-400">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"

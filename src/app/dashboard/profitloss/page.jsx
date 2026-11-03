@@ -30,7 +30,7 @@ export default function ProfitLossPage() {
     setLoading(true);
     setError("");
     try {
-      const [billResponse, expenseResponse, clientResponse] = await Promise.all([fetch("/api/bill", { cache: "no-store" }), fetch("/api/expenses", { cache: "no-store" }), fetch("/api/client", { cache: "no-store" })]);
+      const [billResponse, expenseResponse, clientResponse] = await Promise.all([fetch("/api/bill", { cache: "no-store" }), fetch("/api/expenses", { cache: "no-store" }), fetch("/api/client?includeArchived=true", { cache: "no-store" })]);
       const [billJson, expenseJson, clientJson] = await Promise.all([billResponse.json(), expenseResponse.json(), clientResponse.json()]);
       if (!billResponse.ok || !expenseResponse.ok || !clientResponse.ok) throw new Error(billJson.message || expenseJson.message || clientJson.message || "Could not load report data.");
       setBills(Array.isArray(billJson.data) ? billJson.data : []);

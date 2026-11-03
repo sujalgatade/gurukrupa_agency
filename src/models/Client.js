@@ -29,6 +29,12 @@ const clientSchema = new Schema({
         type: Date,
         default: Date.now,
     },
+    isDeleted: { type: Boolean, default: false },
+    deletedAt: { type: Date, default: null },
 });
+const cachedClientModel = mongoose.models.Client;
+if (cachedClientModel && !cachedClientModel.schema.path("isDeleted")) {
+    mongoose.deleteModel("Client");
+}
 const Client = mongoose.models.Client || mongoose.model("Client", clientSchema);
 export default Client;

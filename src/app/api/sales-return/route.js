@@ -13,6 +13,7 @@ export async function POST(request) {
   let billLine = null;
   let returnEntryPushed = false;
   let beforeLineReturnedBoxes = 0;
+  let beforeLineReturnedItemQty = 0;
   let beforeReturnedAmount = 0;
   let beforeIsPaid = false;
   let creditAdded = 0;
@@ -20,20 +21,30 @@ export async function POST(request) {
   try {
     const input = await request.json();
     const { billId, itemIndex } = input;
-    const boxes = Number(input.boxes);
+    const boxes = Number(input.boxes || 0);
+    const itemQty = Number(input.itemQty || 0);
     const reason = String(input.reason || "").trim();
     if (!mongoose.isValidObjectId(billId) || itemIndex === "" || itemIndex === null || !Number.isInteger(Number(itemIndex)) || Number(itemIndex) < 0) return fail("Choose a valid invoice item.");
-    if (!Number.isInteger(boxes) || boxes < 1 || reason.length < 3) return fail("Enter a positive box quantity and a return reason.");
+    if (!Number.isInteger(boxes) || boxes < 0 || !Number.isInteger(itemQty) || itemQty < 0 || boxes + itemQty === 0 || reason.length < 3) return fail("Enter a positive box or item quantity and a return reason.");
 
     await dbConnect();
-    bill = await Bill.findById(billId);
+    if (!Item.schema.path("looseQty") || !Item.schema.path("looseDate")) {
+      return fail("Open-box stock fields are not loaded by the server yet. Restart the app before saving this return; stock was not changed.", 503);
+    }
+    bill = await Bill.findOne({ _id: billId, isDeleted: { $ne: true } });
     if (!bill) return fail("Invoice not found.", 404);
     billLine = bill.items[Number(itemIndex)];
     if (!billLine) return fail("Invoice item not found.", 404);
-    const alreadyReturned = Number(billLine.returnedBoxes || 0);
-    if (boxes > Number(billLine.boxQty || 0) - alreadyReturned) return fail(`Only ${Number(billLine.boxQty || 0) - alreadyReturned} boxes are available to return.`);
+    const alreadyReturnedBoxes = Number(billLine.returnedBoxes || 0);
+    const alreadyReturnedItems = Number(billLine.returnedItemQty || 0);
+    const unitsPerBox = Number(billLine.quantity || 0);
+    if (!Number.isInteger(unitsPerBox) || unitsPerBox < 1) return fail("This invoice item has an invalid pieces-per-box value.", 409);
+    const totalSoldUnits = unitsPerBox * Number(billLine.boxQty || 0) + Number(billLine.itemQty || 0);
+    const remainingUnits = Math.max(0, totalSoldUnits - alreadyReturnedBoxes * unitsPerBox - alreadyReturnedItems);
+    const returningUnits = boxes * unitsPerBox + itemQty;
+    if (returningUnits > remainingUnits) return fail(`Only ${remainingUnits} pieces are available to return.`);
 
-    const lineSubtotal = Number(billLine.rate || 0) * Number(billLine.quantity || 0) * boxes;
+    const lineSubtotal = Number(billLine.rate || 0) * returningUnits;
     const discountShare = Number(bill.subtotal || 0) > 0 ? Number(bill.discount || 0) * lineSubtotal / Number(bill.subtotal) : 0;
     const amountBeforeTax = Math.max(0, lineSubtotal - discountShare);
     const returnTax = amountBeforeTax * Number(bill.taxRate || 0) / 100;
@@ -49,24 +60,29 @@ export async function POST(request) {
     }
 
     const unitCost = bill.marginBeforeDiscount === undefined ? Number(billLine.originalRate || 0) : Number(billLine.unitCost || 0);
+    const restockDate = new Date();
     const [restocked] = await Item.create([{
       itemname: billLine.itemname,
       box: boxes,
-      itemperbox: billLine.quantity,
+      looseQty: itemQty,
+      looseDate: itemQty > 0 ? restockDate : null,
+      itemperbox: unitsPerBox,
       originalrate: unitCost,
-      purchaseRatePerBox: Number((unitCost * Number(billLine.quantity || 0)).toFixed(2)),
-      date: new Date(),
+      purchaseRatePerBox: Number((unitCost * unitsPerBox).toFixed(2)),
+      date: restockDate,
     }]);
     restockedItemId = restocked._id;
 
-    beforeLineReturnedBoxes = alreadyReturned;
+    beforeLineReturnedBoxes = alreadyReturnedBoxes;
+    beforeLineReturnedItemQty = alreadyReturnedItems;
     beforeReturnedAmount = Number(bill.returnedAmount || 0);
     beforeIsPaid = Boolean(bill.isPaid);
     if (legacyPaidAmount) bill.paidAmount = legacyPaidAmount;
-    billLine.returnedBoxes = alreadyReturned + boxes;
+    billLine.returnedBoxes = alreadyReturnedBoxes + boxes;
+    billLine.returnedItemQty = alreadyReturnedItems + itemQty;
     bill.returnedAmount = Number((beforeReturnedAmount + returnAmount).toFixed(2));
-    const profitReduction = Number((((Number(billLine.rate || 0) - unitCost) * Number(billLine.quantity || 0) * boxes) - discountShare).toFixed(2));
-    bill.returns.push({ date: new Date(), amount: returnAmount, profitReduction, reason, items: [{ itemname: billLine.itemname, boxes, amount: returnAmount }] });
+    const profitReduction = Number((((Number(billLine.rate || 0) - unitCost) * returningUnits) - discountShare).toFixed(2));
+    bill.returns.push({ date: new Date(), amount: returnAmount, profitReduction, reason, items: [{ itemname: billLine.itemname, boxes, itemQty, units: returningUnits, amount: returnAmount }] });
     returnEntryPushed = true;
     bill.isPaid = paidAmount + bill.returnedAmount + Number(bill.creditApplied || 0) >= Number(bill.total || 0) - 0.005;
     await bill.save();
@@ -83,7 +99,10 @@ export async function POST(request) {
   } catch (error) {
     if (bill && restockedItemId) {
       try {
-        if (billLine) billLine.returnedBoxes = beforeLineReturnedBoxes;
+        if (billLine) {
+          billLine.returnedBoxes = beforeLineReturnedBoxes;
+          billLine.returnedItemQty = beforeLineReturnedItemQty;
+        }
         bill.returnedAmount = beforeReturnedAmount;
         bill.isPaid = beforeIsPaid;
         if (returnEntryPushed) bill.returns.pop();
