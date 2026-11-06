@@ -30,7 +30,7 @@ const printDocument = async ({ invoiceData, originalElement, month, pageSize = "
         const pdf = new jsPDF({ unit: "mm", format, orientation: "portrait" });
         const pageWidthMm = pdf.internal.pageSize.getWidth();
         const pageHeightMm = pdf.internal.pageSize.getHeight();
-        const marginMm = 12.7;
+        const marginMm = format === "a5" ? 5 : 8;
         const contentWidthMm = pageWidthMm - marginMm * 2;
         const contentHeightMm = pageHeightMm - marginMm * 2;
         const contentWidthPx = Math.round((contentWidthMm * 96) / 25.4);
@@ -71,7 +71,7 @@ const printDocument = async ({ invoiceData, originalElement, month, pageSize = "
                 minWidth: `${contentWidthPx}px`,
                 maxWidth: "none",
                 margin: "0",
-                padding: "16px",
+                padding: format === "a5" ? "10px" : "16px",
                 background: "#fff",
                 color: "#000",
                 fontFamily: "Arial, sans-serif",

@@ -147,20 +147,28 @@ const InvoicePrint = ({ invoiceData }) => {
       <table
         style={{
           width: "100%",
+          tableLayout: "fixed",
           borderCollapse: "collapse",
-          marginBottom: "24px",
+          marginBottom: "18px",
           color: "#111827",
           fontSize: "13px",
           printColorAdjust: "exact",
           WebkitPrintColorAdjust: "exact",
         }}
       >
+        <colgroup>
+          <col style={{ width: "42%" }} />
+          <col style={{ width: "14%" }} />
+          <col style={{ width: "12%" }} />
+          <col style={{ width: "15%" }} />
+          <col style={{ width: "17%" }} />
+        </colgroup>
         <thead style={{ backgroundColor: "#cbd5e1", color: "#000000" }}>
           <tr>
             <th
               style={{
                 border: "1px solid #475569",
-                padding: "9px 8px",
+                padding: "7px 5px",
                 color: "#000000",
                 fontWeight: "700",
                 textAlign: "left",
@@ -172,7 +180,7 @@ const InvoicePrint = ({ invoiceData }) => {
             <th
               style={{
                 border: "1px solid #475569",
-                padding: "9px 8px",
+                padding: "7px 4px",
                 color: "#000000",
                 fontWeight: "700",
                 textAlign: "center",
@@ -183,7 +191,7 @@ const InvoicePrint = ({ invoiceData }) => {
             <th
               style={{
                 border: "1px solid #475569",
-                padding: "9px 8px",
+                padding: "7px 4px",
                 color: "#000000",
                 fontWeight: "700",
                 textAlign: "center",
@@ -195,7 +203,7 @@ const InvoicePrint = ({ invoiceData }) => {
             <th
               style={{
                 border: "1px solid #475569",
-                padding: "9px 8px",
+                padding: "7px 4px",
                 color: "#000000",
                 fontWeight: "700",
                 textAlign: "right",
@@ -207,7 +215,7 @@ const InvoicePrint = ({ invoiceData }) => {
             <th
               style={{
                 border: "1px solid #475569",
-                padding: "9px 8px",
+                padding: "7px 4px",
                 color: "#000000",
                 fontWeight: "700",
                 textAlign: "right",
@@ -224,9 +232,10 @@ const InvoicePrint = ({ invoiceData }) => {
               <td
                 style={{
                   border: "1px solid #64748b",
-                  padding: "8px",
+                  padding: "7px 5px",
                   color: "#111827",
                   fontWeight: "500",
+                  overflowWrap: "anywhere",
                 }}
               >
                 {item.itemname}
@@ -235,10 +244,11 @@ const InvoicePrint = ({ invoiceData }) => {
               <td
                 style={{
                   border: "1px solid #64748b",
-                  padding: "8px",
+                  padding: "7px 4px",
                   color: "#111827",
                   fontWeight: "500",
                   textAlign: "center",
+                  overflowWrap: "anywhere",
                 }}
               >
                 {Number(item.quantity || 0) * Number(item.boxQty || 0) + Number(item.itemQty || 0)}
@@ -251,7 +261,7 @@ const InvoicePrint = ({ invoiceData }) => {
               <td
                 style={{
                   border: "1px solid #64748b",
-                  padding: "8px",
+                  padding: "7px 4px",
                   color: "#111827",
                   fontWeight: "500",
                   textAlign: "center",
@@ -263,7 +273,7 @@ const InvoicePrint = ({ invoiceData }) => {
               <td
                 style={{
                   border: "1px solid #64748b",
-                  padding: "8px",
+                  padding: "7px 4px",
                   color: "#111827",
                   fontWeight: "500",
                   textAlign: "right",
@@ -275,7 +285,7 @@ const InvoicePrint = ({ invoiceData }) => {
               <td
                 style={{
                   border: "1px solid #64748b",
-                  padding: "8px",
+                  padding: "7px 4px",
                   color: "#111827",
                   fontWeight: "500",
                   textAlign: "right",
