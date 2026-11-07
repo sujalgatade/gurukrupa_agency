@@ -30,6 +30,7 @@ const Billinghistory = () => {
   const [year, setYear] = useState(currentDate.getFullYear());
   const [selectedDay, setSelectedDay] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [pageSize, setPageSize] = useState("a4");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [retryCount, setRetryCount] = useState(0);
@@ -119,11 +120,11 @@ const Billinghistory = () => {
 
   const days = Array.from({ length: daysInMonth }, (_, index) => index + 1);
 
-  // Apply day filter and search, sort newest first, then keep 10 bills.
+  // Apply day filter and search; show all bills for a selected date, otherwise the latest 10.
   const filteredBills = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
 
-    return bills
+    const matchingBills = bills
       .filter((bill) => {
         const dateKey = getDateKey(bill.issueDate);
 
@@ -161,8 +162,9 @@ const Billinghistory = () => {
         const createdB = new Date(b.createdAt).getTime() || 0;
 
         return createdB - createdA;
-      })
-      .slice(0, 10);
+      });
+
+    return selectedDay ? matchingBills : matchingBills.slice(0, 10);
   }, [bills, month, year, selectedDay, searchTerm]);
 
   // Period summaries are based on all bills loaded for the selected month.
@@ -189,7 +191,7 @@ const Billinghistory = () => {
         return;
       }
 
-      printDocument({ month, originalElement });
+      await printDocument({ month, originalElement, pageSize });
     } catch (err) {
       console.error("PDF Error:", err);
     }
@@ -214,7 +216,7 @@ const Billinghistory = () => {
               </h1>
 
               <p className="mt-2 text-sm text-slate-400">
-                Filter, search, and print your 10 latest invoices.
+                Filter and search invoices; selecting a date shows every matching bill.
               </p>
             </div>
 
@@ -437,10 +439,26 @@ const Billinghistory = () => {
               <span className="font-semibold text-white">
                 {loading ? "…" : filteredBills.length}
               </span>{" "}
-              of the latest 10 matching invoices
+              {selectedDay
+                ? "invoices for the selected date"
+                : "of the latest 10 matching invoices"}
             </div>
 
             <div className="flex flex-wrap gap-3">
+              <div>
+                <label htmlFor="sales-history-paper-size" className="sr-only">
+                  Print paper size
+                </label>
+                <select
+                  id="sales-history-paper-size"
+                  value={pageSize}
+                  onChange={(event) => setPageSize(event.target.value)}
+                  className="h-full min-h-12 rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/10"
+                >
+                  <option value="a4">A4 paper</option>
+                  <option value="a5">A5 paper</option>
+                </select>
+              </div>
               {selectedDay && (
                 <button
                   type="button"

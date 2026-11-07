@@ -170,7 +170,7 @@ const InvoicePrint = ({ invoiceData }) => {
                 border: "1px solid #475569",
                 padding: "7px 5px",
                 color: "#000000",
-                fontWeight: "700",
+                fontWeight: "500",
                 textAlign: "center",
                 whiteSpace: "normal",
               }}
@@ -183,7 +183,7 @@ const InvoicePrint = ({ invoiceData }) => {
                 border: "1px solid #475569",
                 padding: "7px 4px",
                 color: "#000000",
-                fontWeight: "700",
+                fontWeight: "500",
                 textAlign: "center",
               }}
             >
@@ -194,7 +194,7 @@ const InvoicePrint = ({ invoiceData }) => {
                 border: "1px solid #475569",
                 padding: "7px 4px",
                 color: "#000000",
-                fontWeight: "700",
+                fontWeight: "500",
                 textAlign: "center",
               }}
             >
@@ -206,7 +206,7 @@ const InvoicePrint = ({ invoiceData }) => {
                 border: "1px solid #475569",
                 padding: "7px 4px",
                 color: "#000000",
-                fontWeight: "700",
+                fontWeight: "500",
                 textAlign: "right",
               }}
             >
@@ -218,7 +218,7 @@ const InvoicePrint = ({ invoiceData }) => {
                 border: "1px solid #475569",
                 padding: "7px 4px",
                 color: "#000000",
-                fontWeight: "700",
+                fontWeight: "500",
                 textAlign: "right",
               }}
             >

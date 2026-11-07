@@ -30,6 +30,7 @@ const Orders = () => {
   const [selectedYear, setSelectedYear] = useState(
     String(currentDate.getFullYear()),
   );
+  const [pageSize, setPageSize] = useState("a4");
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -240,6 +241,86 @@ const Orders = () => {
 
   return (
     <main className="min-h-screen w-full bg-slate-950 text-white">
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: ${pageSize.toUpperCase()} landscape;
+            margin: 12mm;
+          }
+
+          body * {
+            visibility: hidden !important;
+          }
+
+          .orders-print-area,
+          .orders-print-area * {
+            visibility: visible !important;
+          }
+
+          .orders-print-area {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            max-width: none !important;
+            overflow: visible !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            background: #fff !important;
+            color: #111827 !important;
+            box-shadow: none !important;
+          }
+
+          .orders-print-area * {
+            color: #111827 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+          }
+
+          .orders-print-area .orders-no-print {
+            display: none !important;
+          }
+
+          .orders-print-area .overflow-x-auto {
+            overflow: visible !important;
+          }
+
+          .orders-print-area table {
+            width: 100% !important;
+            min-width: 0 !important;
+            table-layout: fixed !important;
+            border-collapse: collapse !important;
+          }
+
+          .orders-print-area th,
+          .orders-print-area td {
+            background: #fff !important;
+            border: 1px solid #64748b !important;
+            padding: 7px 8px !important;
+            white-space: normal !important;
+          }
+
+          .orders-print-area thead th {
+            background: #e8eef5 !important;
+          }
+
+          .orders-print-area tbody td span {
+            min-width: 0 !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            padding: 0 !important;
+          }
+
+          .orders-print-area tr {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+
+          .orders-print-only {
+            display: block !important;
+          }
+        }
+      `}</style>
       {/* Header */}
       <header className="border-b border-slate-800 bg-slate-950/95">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
@@ -379,7 +460,7 @@ const Orders = () => {
         </section>
 
         {/* Table */}
-        <section className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
+        <section className="orders-print-area overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
           <div className="flex flex-col gap-3 border-b border-slate-800 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div>
               <h2 className="font-semibold text-white">
@@ -388,13 +469,42 @@ const Orders = () => {
               <p className="mt-1 text-sm text-slate-400">
                 Matching bills are combined by date and product. Loose pieces appear on their own row.
               </p>
+              <p className="orders-print-only hidden mt-2 text-sm">
+                Records for {selectedDay ? `Day ${selectedDay}, ` : ""}
+                {MONTHS[Number(selectedMonth) - 1]} {selectedYear}
+              </p>
             </div>
 
-            <span className="w-fit rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-slate-300">
-              {isLoading
-                ? <span className="inline-flex items-center gap-1"><LoadingAnimation size={24} label="Loading orders" />Loading...</span>
-                : `${productSummary.length} product records`}
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="w-fit rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-slate-300">
+                {isLoading
+                  ? <span className="inline-flex items-center gap-1"><LoadingAnimation size={24} label="Loading orders" />Loading...</span>
+                  : `${productSummary.length} product records`}
+              </span>
+              <label htmlFor="orders-paper-size" className="sr-only">
+                Print paper size
+              </label>
+              <select
+                id="orders-paper-size"
+                value={pageSize}
+                onChange={(event) => setPageSize(event.target.value)}
+                className="orders-no-print rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+              >
+                <option value="a4">A4</option>
+                <option value="a5">A5</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                disabled={isLoading || quantityRows.length === 0}
+                className="orders-no-print inline-flex items-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 8V3.75h10V8M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5h-2M7 14h10v6.25H7zM17 11.5h.01" />
+                </svg>
+                Print Table
+              </button>
+            </div>
           </div>
 
           {isLoading ? (
