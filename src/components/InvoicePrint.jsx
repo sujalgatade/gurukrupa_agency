@@ -151,17 +151,17 @@ const InvoicePrint = ({ invoiceData }) => {
           borderCollapse: "collapse",
           marginBottom: "18px",
           color: "#111827",
-          fontSize: "13px",
+          fontSize: "12px",
           printColorAdjust: "exact",
           WebkitPrintColorAdjust: "exact",
         }}
       >
         <colgroup>
-          <col style={{ width: "42%" }} />
-          <col style={{ width: "14%" }} />
+          <col style={{ width: "48%" }} />
           <col style={{ width: "12%" }} />
-          <col style={{ width: "15%" }} />
-          <col style={{ width: "17%" }} />
+          <col style={{ width: "10%" }} />
+          <col style={{ width: "14%" }} />
+          <col style={{ width: "16%" }} />
         </colgroup>
         <thead style={{ backgroundColor: "#cbd5e1", color: "#000000" }}>
           <tr>
@@ -171,7 +171,8 @@ const InvoicePrint = ({ invoiceData }) => {
                 padding: "7px 5px",
                 color: "#000000",
                 fontWeight: "700",
-                textAlign: "left",
+                textAlign: "center",
+                whiteSpace: "normal",
               }}
             >
               Description
@@ -232,13 +233,24 @@ const InvoicePrint = ({ invoiceData }) => {
               <td
                 style={{
                   border: "1px solid #64748b",
-                  padding: "7px 5px",
+                  padding: "6px 4px",
                   color: "#111827",
                   fontWeight: "500",
-                  overflowWrap: "anywhere",
+                  textAlign: "center",
                 }}
               >
-                {item.itemname}
+                <span
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    maxWidth: "100%",
+                    whiteSpace: "normal",
+                    overflowWrap: "anywhere",
+                    wordBreak: "normal",
+                  }}
+                >
+                  {item.itemname}
+                </span>
               </td>
 
               <td

@@ -118,13 +118,14 @@ const printDocument = async ({ invoiceData, originalElement, month, pageSize = "
                     const fitScale = Math.min(1, contentHeightMm / naturalHeightMm);
                     const imageWidthMm = contentWidthMm * fitScale;
                     const imageHeightMm = naturalHeightMm * fitScale;
-                    const imageX = marginMm + (contentWidthMm - imageWidthMm) / 2;
+                    const imageX = (pageWidthMm - imageWidthMm) / 2;
+                    const imageY = (pageHeightMm - imageHeightMm) / 2;
 
                     pdf.addImage(
                         canvas.toDataURL("image/jpeg", 0.94),
                         "JPEG",
                         imageX,
-                        marginMm,
+                        imageY,
                         imageWidthMm,
                         imageHeightMm,
                         undefined,

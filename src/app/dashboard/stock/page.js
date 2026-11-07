@@ -60,10 +60,11 @@ const getBoxQuantity = (purchase) =>
   purchase?.numberOfBoxes ??
   0;
 
-const getLooseQuantity = (purchase) => purchase?.looseQty ?? purchase?.looseQuantity ?? 0;
+const getLooseQuantity = (purchase) =>
+  purchase?.looseQty ?? purchase?.looseQuantity ?? 0;
 
 const getBuyingRate = (purchase) =>
-  purchase?.originalrate??
+  purchase?.originalrate ??
   purchase?.buyingRatePerItem ??
   purchase?.buyingPricePerItem ??
   purchase?.buyingRate ??
@@ -141,7 +142,8 @@ const expandStockLots = (lots) =>
         box: boxes,
         looseQty: 0,
         stockType: "Full boxes",
-        rowDate: lot.date ?? lot.purchaseDate ?? lot.buyDate ?? lot.createdAt ?? null,
+        rowDate:
+          lot.date ?? lot.purchaseDate ?? lot.buyDate ?? lot.createdAt ?? null,
         rowId: `${getPurchaseId(lot, 0)}-boxes`,
       });
     }
@@ -151,7 +153,12 @@ const expandStockLots = (lots) =>
         box: 0,
         looseQty: loose,
         stockType: "Open box · loose pieces",
-        rowDate: lot.date ?? lot.purchaseDate ?? lot.buyDate ?? lot.createdAt ?? getPurchaseDate(lot),
+        rowDate:
+          lot.date ??
+          lot.purchaseDate ??
+          lot.buyDate ??
+          lot.createdAt ??
+          getPurchaseDate(lot),
         rowId: `${getPurchaseId(lot, 0)}-loose`,
       });
     }
@@ -209,9 +216,7 @@ const PurchaseHistory = () => {
   // Days available in the selected month and year.
   const daysInMonth = useMemo(
     () =>
-      month && year
-        ? new Date(Number(year), Number(month), 0).getDate()
-        : 31,
+      month && year ? new Date(Number(year), Number(month), 0).getDate() : 31,
     [month, year],
   );
 
@@ -228,7 +233,11 @@ const PurchaseHistory = () => {
 
     return expandStockLots(purchases)
       .filter((purchase) => {
-        if (Number(getBoxQuantity(purchase)) <= 0 && Number(getLooseQuantity(purchase)) <= 0) return false;
+        if (
+          Number(getBoxQuantity(purchase)) <= 0 &&
+          Number(getLooseQuantity(purchase)) <= 0
+        )
+          return false;
 
         const dateKey = getDateKey(getPurchaseDate(purchase));
 
@@ -273,7 +282,10 @@ const PurchaseHistory = () => {
       });
   }, [purchases, month, year, selectedDay, search]);
 
-  const stockRowCount = useMemo(() => expandStockLots(purchases).length, [purchases]);
+  const stockRowCount = useMemo(
+    () => expandStockLots(purchases).length,
+    [purchases],
+  );
 
   const clearFilters = () => {
     setMonth("");
@@ -283,10 +295,7 @@ const PurchaseHistory = () => {
   };
 
   const hasFilters =
-    selectedDay !== "" ||
-    search.trim() !== "" ||
-    month !== "" ||
-    year !== "";
+    selectedDay !== "" || search.trim() !== "" || month !== "" || year !== "";
 
   return (
     <main className="min-h-screen w-full bg-slate-950 text-white">
@@ -337,7 +346,9 @@ const PurchaseHistory = () => {
                   d="M5.5 9A7 7 0 0 1 18 6l2 6M4 12l2 6a7 7 0 0 0 12.5-1"
                 />
               </svg>
-              {loading && <LoadingAnimation size={28} label="Loading purchases" />}
+              {loading && (
+                <LoadingAnimation size={28} label="Loading purchases" />
+              )}
               {loading ? "Loading..." : "Refresh"}
             </button>
           </div>
@@ -550,7 +561,12 @@ const PurchaseHistory = () => {
                       colSpan={7}
                       className="px-5 py-16 text-center text-slate-400"
                     >
-                      <div className="mb-3 flex justify-center"><LoadingAnimation size={64} label="Loading purchase records" /></div>
+                      <div className="mb-3 flex justify-center">
+                        <LoadingAnimation
+                          size={64}
+                          label="Loading purchase records"
+                        />
+                      </div>
                       Loading purchase records...
                     </td>
                   </tr>
@@ -603,7 +619,9 @@ const PurchaseHistory = () => {
                       </td>
 
                       <td className="px-5 py-4">
-                        <span className={`inline-flex rounded-lg px-3 py-1.5 text-xs font-semibold ${purchase.stockType?.startsWith("Open") ? "bg-amber-400/10 text-amber-300" : "bg-slate-800 text-slate-200"}`}>
+                        <span
+                          className={`inline-flex rounded-lg px-3 py-1.5 text-xs font-semibold ${purchase.stockType?.startsWith("Open") ? "bg-amber-400/10 text-amber-300" : "bg-slate-800 text-slate-200"}`}
+                        >
                           {purchase.stockType || "Stock"}
                         </span>
                       </td>
@@ -621,7 +639,9 @@ const PurchaseHistory = () => {
                       </td>
 
                       <td className="px-5 py-4 text-center">
-                        <span className={`inline-flex min-w-14 items-center justify-center rounded-lg px-3 py-1.5 text-sm font-semibold ${Number(getLooseQuantity(purchase)) > 0 ? "bg-amber-400/10 text-amber-300" : "bg-slate-800 text-slate-500"}`}>
+                        <span
+                          className={`inline-flex min-w-14 items-center justify-center rounded-lg px-3 py-1.5 text-sm font-semibold ${Number(getLooseQuantity(purchase)) > 0 ? "bg-amber-400/10 text-amber-300" : "bg-slate-800 text-slate-500"}`}
+                        >
                           {Number(getLooseQuantity(purchase)) || "—"}
                         </span>
                       </td>
