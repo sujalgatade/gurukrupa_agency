@@ -4,6 +4,13 @@
 import axios from "axios";
 import { useEffect, useMemo, useState } from "react";
 import LoadingAnimation from "@/components/LoadingAnimation";
+import Link from "next/link";
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+const currentDate = new Date();
 
 const Payment = () => {
   const [bills, setBills] = useState([]);
@@ -12,10 +19,20 @@ const Payment = () => {
   const [processingId, setProcessingId] = useState(null);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedDay, setSelectedDay] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState("");
+  const [selectedYear, setSelectedYear] = useState("");
   const [paymentAmounts, setPaymentAmounts] = useState({});
   const [paymentMethods, setPaymentMethods] = useState({});
   const [openingAmounts, setOpeningAmounts] = useState({});
   const [openingMethods, setOpeningMethods] = useState({});
+
+  const filterYears = Array.from({ length: 10 }, (_, index) => currentDate.getFullYear() - index);
+  const yearsForFilter = selectedYear ? [Number(selectedYear)] : filterYears;
+  const daysInFilterMonth = selectedMonth
+    ? Math.max(...yearsForFilter.map((year) => new Date(year, Number(selectedMonth), 0).getDate()))
+    : 31;
+  const filterDays = Array.from({ length: daysInFilterMonth }, (_, index) => index + 1);
 
   const outstandingFor = (bill) => bill.isPaid ? 0 : Math.max(0, Number(bill.total || 0) - Number(bill.paidAmount || 0) - Number(bill.returnedAmount || 0) - Number(bill.creditApplied || 0));
   const openingDueFor = (client) => Math.max(0, Number(client.openingBalance || 0) - Number(client.openingBalancePaid || 0));
@@ -98,6 +115,16 @@ const Payment = () => {
     const term = searchTerm.trim().toLowerCase();
 
     return bills.filter((bill) => {
+      const issueDate = bill.issueDate ? new Date(bill.issueDate) : null;
+      const issueDateKey = issueDate && !Number.isNaN(issueDate.getTime())
+        ? `${issueDate.getFullYear()}-${String(issueDate.getMonth() + 1).padStart(2, "0")}-${String(issueDate.getDate()).padStart(2, "0")}`
+        : "";
+      if (!issueDateKey) return false;
+      const [invoiceYear, invoiceMonth, invoiceDay] = issueDateKey.split("-").map(Number);
+      if (selectedDay && invoiceDay !== Number(selectedDay)) return false;
+      if (selectedMonth && invoiceMonth !== Number(selectedMonth)) return false;
+      if (selectedYear && invoiceYear !== Number(selectedYear)) return false;
+
       const invoiceNumber = String(bill.invoiceNumber ?? "").toLowerCase();
       const clientName = String(
         bill.client?.clientname ?? ""
@@ -110,7 +137,17 @@ const Payment = () => {
         address.includes(term)
       );
     });
-  }, [bills, searchTerm]);
+  }, [bills, searchTerm, selectedDay, selectedMonth, selectedYear]);
+
+  const filteredOpeningClients = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return clients.filter((client) => {
+      if (openingDueFor(client) <= 0) return false;
+      return [client.clientname, client.address].some((value) =>
+        String(value || "").toLowerCase().includes(term),
+      );
+    });
+  }, [clients, searchTerm]);
 
   const totalAmount = useMemo(
     () => bills.reduce((sum, bill) => sum + outstandingFor(bill), 0)
@@ -181,6 +218,11 @@ const Payment = () => {
             </button>
           </div>
         </header>
+
+        <nav className="billing-tabs mb-6" aria-label="Payments views">
+          <Link href="/dashboard/payment" aria-current="page">Payments</Link>
+          <Link href="/dashboard/payment/history">Payment History</Link>
+        </nav>
 
         {/* Summary Cards */}
         <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -299,6 +341,45 @@ const Payment = () => {
             />
           </div>
 
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <label htmlFor="payment-filter-day" className="mb-2 block text-sm font-medium text-slate-300">
+                Date (Day Number)
+              </label>
+              <select id="payment-filter-day" value={selectedDay} onChange={(event) => setSelectedDay(event.target.value)} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-amber-400">
+                <option value="">All Days</option>
+                {filterDays.map((day) => <option key={day} value={String(day)}>{day}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="payment-filter-month" className="mb-2 block text-sm font-medium text-slate-300">
+                Month
+              </label>
+              <select id="payment-filter-month" value={selectedMonth} onChange={(event) => { setSelectedMonth(event.target.value); setSelectedDay(""); }} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-amber-400">
+                <option value="">All Months</option>
+                {MONTHS.map((month, index) => <option key={month} value={String(index + 1)}>{month}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="payment-filter-year" className="mb-2 block text-sm font-medium text-slate-300">
+                Year
+              </label>
+              <select id="payment-filter-year" value={selectedYear} onChange={(event) => { setSelectedYear(event.target.value); setSelectedDay(""); }} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-amber-400">
+                <option value="">All Years</option>
+                {filterYears.map((year) => <option key={year} value={String(year)}>{year}</option>)}
+              </select>
+            </div>
+            {(selectedDay || selectedMonth || selectedYear) && (
+              <button
+                type="button"
+                onClick={() => { setSelectedDay(""); setSelectedMonth(""); setSelectedYear(""); }}
+                className="self-end rounded-xl border border-slate-700 px-4 py-3 text-sm font-semibold text-slate-300 transition hover:border-amber-400 hover:text-amber-300"
+              >
+                Clear date filter
+              </button>
+            )}
+          </div>
+
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
             <p className="text-slate-400">
               Showing{" "}
@@ -307,7 +388,7 @@ const Payment = () => {
               </span>{" "}
               of{" "}
               <span className="font-semibold text-white">{bills.length}</span>{" "}
-              unpaid invoices
+              matching unpaid invoices
             </p>
 
             {searchTerm && (
@@ -320,7 +401,41 @@ const Payment = () => {
               </button>
             )}
           </div>
+          <p className="mt-2 text-xs text-slate-500">
+            Date filters apply to invoice dates. Opening balance dues are listed separately.
+          </p>
         </section>
+
+        {filteredOpeningClients.length > 0 && (
+          <section className="mb-6 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
+            <div className="border-b border-slate-800 px-5 py-4 sm:px-6">
+              <h2 className="font-semibold text-white">Opening Balances Due</h2>
+              <p className="mt-1 text-sm text-slate-400">These customer balances can be collected here and are not filtered by invoice date.</p>
+            </div>
+            <div className="divide-y divide-slate-800">
+              {filteredOpeningClients.map((client) => (
+                <div key={client._id} className="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_150px_150px_auto] sm:items-end sm:px-6">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-white">{client.clientname}{client.isDeleted && <span className="ml-2 rounded-full border border-slate-700 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Archived</span>}</p>
+                    <p className="truncate text-xs text-slate-400">{client.address || "Customer account"}</p>
+                    <p className="mt-1 text-sm font-bold text-amber-400">Due {formatCurrency(openingDueFor(client))}</p>
+                  </div>
+                  <div>
+                    <label htmlFor={`opening-payment-${client._id}`} className="mb-1.5 block text-xs text-slate-400">Amount received</label>
+                    <input id={`opening-payment-${client._id}`} type="number" min="0.01" max={openingDueFor(client)} step="0.01" value={openingAmounts[client._id] ?? openingDueFor(client)} onChange={(event) => setOpeningAmounts((prev) => ({ ...prev, [client._id]: event.target.value }))} className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white" />
+                  </div>
+                  <div>
+                    <label htmlFor={`opening-method-${client._id}`} className="mb-1.5 block text-xs text-slate-400">Method</label>
+                    <select id={`opening-method-${client._id}`} value={openingMethods[client._id] || "Cash"} onChange={(event) => setOpeningMethods((prev) => ({ ...prev, [client._id]: event.target.value }))} className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white"><option>Cash</option><option>UPI</option><option>Bank</option><option>Cheque</option><option>Other</option></select>
+                  </div>
+                  <button type="button" onClick={() => handleOpeningPaid(client)} disabled={processingId === `opening-${client._id}`} className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-500 disabled:opacity-50">
+                    {processingId === `opening-${client._id}` ? "Saving…" : "Record receipt"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Error Message */}
         {error && (
